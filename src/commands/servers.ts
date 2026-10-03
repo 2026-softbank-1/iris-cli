@@ -78,8 +78,11 @@ export async function runServersAdd(
       body: { name },
     });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 409) {
+    if (error instanceof ApiError && error.code === "ONPREM_SERVER_NAME_CONFLICT") {
       throw new CliError(`같은 이름의 서버가 이미 있습니다: ${name}. 다른 이름을 쓰거나 \`likelion servers\` 로 확인해 주세요.`);
+    }
+    if (error instanceof ApiError && error.status === 409) {
+      throw new CliError(`서버를 등록할 수 없습니다 (${error.message}). \`likelion servers\` 로 확인해 주세요.`);
     }
     if (error instanceof ApiError && error.status === 422) {
       throw new CliError(`서버 이름을 쓸 수 없습니다: ${name}. 1~63자로 정해 주세요.`);

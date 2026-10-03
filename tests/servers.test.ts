@@ -203,12 +203,21 @@ describe("runServersAdd", () => {
     );
   });
 
-  it("같은_이름이_있으면_409_를_알기_쉽게_알린다", async () => {
-    const t = await setup([errorEnvelope(409, "CONFLICT", "onprem server name already exists")]);
+  it("같은_이름이_있으면_ONPREM_SERVER_NAME_CONFLICT_를_알기_쉽게_알린다", async () => {
+    const t = await setup([errorEnvelope(409, "ONPREM_SERVER_NAME_CONFLICT", "onprem server name already exists")]);
 
     await expect(runServersAdd({ name: "home-lab", wait: true }, t.deps)).rejects.toThrow(
       "같은 이름의 서버가 이미 있습니다: home-lab",
     );
+  });
+
+  it("다른_409_는_이름_중복으로_보지_않고_서버_메시지와_함께_알린다", async () => {
+    const t = await setup([errorEnvelope(409, "CONFLICT", "something else")]);
+
+    const failure = runServersAdd({ name: "home-lab", wait: true }, t.deps);
+
+    await expect(failure).rejects.toThrow("서버를 등록할 수 없습니다 (something else).");
+    await expect(failure).rejects.not.toThrow("같은 이름");
   });
 
   it("이름이_규칙에_맞지_않으면_422_를_알기_쉽게_알린다", async () => {

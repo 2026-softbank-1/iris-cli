@@ -37,7 +37,7 @@ CLI                                          Control API                사용�
 | 명령 | 엔드포인트 | 처리 |
 |---|---|---|
 | `servers` (`list`) | `GET /onprem-servers` | 표로 보여 준다. 빈 목록이면 `servers add` 를 안내한다 |
-| `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 → 같은 이름 안내, 422 → 1~63자 안내 |
+| `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 `ONPREM_SERVER_NAME_CONFLICT` → 같은 이름 안내(다른 409 는 서버 메시지를 붙여 안내), 422 → 1~63자 안내 |
 | `servers add`·`token` 의 기다리기 | `GET /onprem-servers/{id}` | 3초마다. 상태가 바뀔 때만 찍는다. `CONNECTED` 면 성공, `FAILED` 면 `failureCode` 와 `servers token` 안내로 실패. 5xx·연결 끊김은 연속 5회까지 다시 확인하고, 4xx 는 바로 끝낸다. Ctrl+C 면 등록은 남는다고 알리고 끝낸다. `--no-wait` 면 부르지 않는다 |
 | `servers token <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `POST /onprem-servers/{id}/registration-token` → `{server, registrationToken, installCommand}` | 409 `INVALID_STATUS_TRANSITION` → 대기·실패 상태에서만 된다고 안내 |
 | `servers remove <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `DELETE /onprem-servers/{id}` → 204 | 확인을 묻는다(`--yes` 면 생략, 비대화형이면 `--yes` 필수). 409 `ONPREM_SERVER_IN_USE` → 서비스를 먼저 지우라고 안내 |
@@ -68,7 +68,7 @@ CLI                                          Control API                사용�
 
 묶고 올리기 전에 서비스의 타깃 중 `connectionStatus` 가 있고 `CONNECTED` 가 아닌 것이 있으면 서버 이름과 상태를 알리고 멈춘다. 그래도 서버가 배포 요청(`POST /services/{id}/deployments`)을 409 `TARGET_NOT_CONNECTED` 로 거절하면 같은 뜻의 메시지로 끝낸다.
 
-## 열린 질문
+## 확인된 점
 
-- `POST /onprem-servers` 의 이름 중복 409 코드. CLI 는 코드와 상관없이 409 면 이름 중복으로 안내한다.
+- 남의 서버·삭제된 서버의 타깃으로 서비스를 만들면 서버는 없는 타깃과 같은 422 `INVALID_INPUT`(`unknown target`)을 준다.
 - `GET /onprem-servers/{id}` 를 기다리는 동안 토큰을 재발급하면 `registrationExpiresAt` 이 바뀐다. CLI 는 매번 받은 값으로 만료를 다시 본다.
