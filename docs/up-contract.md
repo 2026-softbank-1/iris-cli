@@ -59,7 +59,7 @@ CLI                                   Control API
 ```
 
 - `triggerType=CLI` 이면 `uploadId` 가 필수이고, 다른 트리거에서는 `uploadId` 를 받지 않는다(기존 `sourceDeploymentId` 검증과 같은 방식).
-- 응답은 기존 `DeploymentResponse` 와 같다. `sourceSha` 에는 업로드를 가리키는 값을 넣는다(형식은 서버가 정하고 `docs/up-contract.md` 에 적는다). `sourceCommitMessage` 는 비어 있어도 된다.
+- 응답은 기존 `DeploymentResponse` 와 같다. `sourceSha` 에는 업로드를 가리키는 값을 넣는다. 운영 서버는 `upload-` 뒤에 16진수 12자리를 붙인 값(예: `upload-46cce13380d1`)을 돌려주고, CLI 는 `upload-` 로 시작하는 값을 줄이지 않고 보여 준다(Git SHA 는 앞 7자만). `sourceCommitMessage` 는 비어 있어도 된다.
 - 알 수 없는 `uploadId` 는 `404`(`UPLOAD_NOT_FOUND`), 이미 쓰였거나 만료됐으면 `409`(`UPLOAD_UNAVAILABLE`), 진행 중인 배포가 있으면 기존대로 `409`(`DEPLOYMENT_IN_PROGRESS`).
 - 한 업로드는 배포 요청 하나에만 묶인다.
 

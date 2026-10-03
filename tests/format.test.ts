@@ -33,4 +33,16 @@ describe("shortSha", () => {
   it("앞_7자리만_남긴다", () => {
     expect(shortSha("446917d0123456789")).toBe("446917d");
   });
+
+  it("Git_SHA_40자리는_앞_7자리만_남긴다", () => {
+    expect(shortSha("446917d0123456789abcdef0123456789abcdef0")).toBe("446917d");
+  });
+
+  it("upload_로_시작하는_값은_전체를_보여_준다", () => {
+    expect(shortSha("upload-46cce13380d1")).toBe("upload-46cce13380d1");
+  });
+
+  it("값이_없으면_빈_문자열_그대로", () => {
+    expect(shortSha("")).toBe("");
+  });
 });
