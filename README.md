@@ -11,7 +11,7 @@
 | `likelion status` | 연결된 서비스의 최근 배포 상태·단계별 소요 시간·주소를 보여 준다 | 구현됨 |
 | `likelion logs [-f] [--since 1h] [-n 200] [--search <text>] [--target <id\|name>]` | 런타임 로그를 보여 주고 `-f` 면 새 로그를 계속 따라간다 | 구현됨 (빌드 로그 제외) |
 | `likelion open [--target <id\|name>] [--no-browser]` | 배포된 서비스 주소를 브라우저로 연다 | 구현됨 |
-| `likelion up [--detach]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 서버 업로드 API 대기 |
+| `likelion up [--detach]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 운영 서버에서 `up` 한 번으로 배포 확인 |
 
 ## 연결(`link`)
 
