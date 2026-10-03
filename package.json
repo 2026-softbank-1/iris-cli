@@ -1,11 +1,11 @@
 {
-  "name": "anydeploy",
+  "name": "likelion",
   "version": "0.1.0",
-  "description": "AnyDeploy CLI",
+  "description": "Likelion CLI",
   "private": true,
   "type": "module",
   "bin": {
-    "anydeploy": "dist/index.js"
+    "likelion": "dist/index.js"
   },
   "files": [
     "dist"

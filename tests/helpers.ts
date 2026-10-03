@@ -7,11 +7,11 @@ import { afterEach, beforeEach } from "vitest";
 export function useTempConfigDir(): void {
   let dir: string;
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "anydeploy-test-"));
-    process.env.ANYDEPLOY_CONFIG_DIR = dir;
+    dir = await mkdtemp(join(tmpdir(), "likelion-test-"));
+    process.env.LIKELION_CONFIG_DIR = dir;
   });
   afterEach(async () => {
-    delete process.env.ANYDEPLOY_CONFIG_DIR;
+    delete process.env.LIKELION_CONFIG_DIR;
     await rm(dir, { recursive: true, force: true });
   });
 }

@@ -40,12 +40,12 @@ describe("credentials", () => {
 
 describe("resolveApiUrl", () => {
   it("옵션이_환경변수보다_우선하고_끝_슬래시는_뗀다", () => {
-    process.env.ANYDEPLOY_API_URL = "https://from-env.test";
+    process.env.LIKELION_API_URL = "https://from-env.test";
     try {
       expect(resolveApiUrl("https://from-option.test/")).toBe("https://from-option.test");
       expect(resolveApiUrl(undefined)).toBe("https://from-env.test");
     } finally {
-      delete process.env.ANYDEPLOY_API_URL;
+      delete process.env.LIKELION_API_URL;
     }
   });
 

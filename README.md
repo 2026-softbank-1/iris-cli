@@ -1,14 +1,14 @@
-# AnyDeploy CLI
+# Likelion CLI
 
-[AnyDeploy](https://github.com/2026-softbank-1/iris-was) Control API 를 터미널에서 쓰는 CLI. 명령 이름은 `anydeploy` 다.
+[Likelion](https://github.com/2026-softbank-1/iris-was) Control API 를 터미널에서 쓰는 CLI. 명령 이름은 `likelion` 이다.
 
 | 명령 | 설명 | 상태 |
 |---|---|---|
-| `anydeploy login` | 브라우저에서 GitHub 로그인을 승인하면 토큰을 받아 저장한다 | 구현됨 (서버 API 대기, [계약](docs/login-contract.md)) |
-| `anydeploy whoami` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
-| `anydeploy logout` | 저장된 로그인 정보를 지운다 | 구현됨 |
-| `anydeploy link` · `up` | 현재 폴더를 서비스에 연결하고 로컬 소스로 배포한다 | 예정 |
-| `anydeploy logs` · `status` · `open` | 로그·상태 확인, 배포 도메인 열기 | 예정 |
+| `likelion login` | 브라우저에서 GitHub 로그인을 승인하면 토큰을 받아 저장한다 | 구현됨 (서버 API 대기, [계약](docs/login-contract.md)) |
+| `likelion whoami` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
+| `likelion logout` | 저장된 로그인 정보를 지운다 | 구현됨 |
+| `likelion link` · `up` | 현재 폴더를 서비스에 연결하고 로컬 소스로 배포한다 | 예정 |
+| `likelion logs` · `status` · `open` | 로그·상태 확인, 배포 도메인 열기 | 예정 |
 
 ## 개발
 
@@ -24,8 +24,8 @@ npm run build              # dist/index.js (실행 파일, shebang 포함)
 
 ## 설정
 
-- API 주소: `login --api-url <url>` > 환경변수 `ANYDEPLOY_API_URL` > 기본값 `https://api.likelion.uk`. 로그인한 뒤에는 저장된 주소를 쓴다.
-- 로그인 정보: `~/.config/anydeploy/credentials.json` (권한 `0600`). `XDG_CONFIG_HOME` 으로 위치를 바꾸고, 테스트에서는 `ANYDEPLOY_CONFIG_DIR` 로 덮어쓴다. 토큰은 로그·출력에 남기지 않는다.
+- API 주소: `login --api-url <url>` > 환경변수 `LIKELION_API_URL` > 기본값 `https://api.likelion.uk`. 로그인한 뒤에는 저장된 주소를 쓴다.
+- 로그인 정보: `~/.config/likelion/credentials.json` (권한 `0600`). `XDG_CONFIG_HOME` 으로 위치를 바꾸고, 테스트에서는 `LIKELION_CONFIG_DIR` 로 덮어쓴다. 토큰은 로그·출력에 남기지 않는다.
 
 ## 규칙
 

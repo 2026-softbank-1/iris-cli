@@ -17,7 +17,7 @@ export async function runWhoami(deps: WhoamiDeps = {}): Promise<Me> {
   const log = deps.log ?? console.log;
   const credentials = await findCredentials();
   if (!credentials) {
-    throw new CliError("로그인되어 있지 않습니다. `anydeploy login` 을 실행해 주세요.");
+    throw new CliError("로그인되어 있지 않습니다. `likelion login` 을 실행해 주세요.");
   }
 
   const api = new ApiClient(credentials.apiUrl, deps.fetchImpl);
@@ -28,7 +28,7 @@ export async function runWhoami(deps: WhoamiDeps = {}): Promise<Me> {
     return me;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      throw new CliError("세션이 만료되었습니다. `anydeploy login` 을 다시 실행해 주세요.");
+      throw new CliError("세션이 만료되었습니다. `likelion login` 을 다시 실행해 주세요.");
     }
     throw error;
   }

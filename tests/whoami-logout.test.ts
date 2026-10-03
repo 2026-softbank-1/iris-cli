@@ -14,7 +14,7 @@ const credentials = {
 
 describe("runWhoami", () => {
   it("로그인_정보가_없으면_login_안내", async () => {
-    await expect(runWhoami({ log: vi.fn() })).rejects.toThrow("anydeploy login");
+    await expect(runWhoami({ log: vi.fn() })).rejects.toThrow("likelion login");
   });
 
   it("저장된_토큰으로_GitHub_계정을_출력한다", async () => {

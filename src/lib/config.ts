@@ -11,9 +11,9 @@ export interface Credentials {
 }
 
 function configDir(): string {
-  if (process.env.ANYDEPLOY_CONFIG_DIR) return process.env.ANYDEPLOY_CONFIG_DIR;
+  if (process.env.LIKELION_CONFIG_DIR) return process.env.LIKELION_CONFIG_DIR;
   const base = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
-  return join(base, "anydeploy");
+  return join(base, "likelion");
 }
 
 export function credentialsPath(): string {
@@ -44,6 +44,6 @@ export async function deleteCredentials(): Promise<boolean> {
 }
 
 export function resolveApiUrl(option: string | undefined): string {
-  const url = option ?? process.env.ANYDEPLOY_API_URL ?? DEFAULT_API_URL;
+  const url = option ?? process.env.LIKELION_API_URL ?? DEFAULT_API_URL;
   return url.replace(/\/+$/, "");
 }
