@@ -34,6 +34,7 @@ export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promis
     value: options.project,
     ask: deps.ask,
     log,
+    emptyMessage: "프로젝트가 없습니다. 대시보드에서 프로젝트를 먼저 만들어 주세요.",
   });
 
   const services = await api.request<Service[]>("GET", `/projects/${project.id}/services`, {
@@ -45,6 +46,7 @@ export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promis
     value: options.service,
     ask: deps.ask,
     log,
+    emptyMessage: `'${project.name}' 프로젝트에 서비스가 없습니다. 서비스는 대시보드에서 GitHub 레포를 연결해 만들며, 레포가 없으면 만들 수 없습니다. 서비스를 만든 뒤 다시 실행해 주세요.`,
   });
 
   const link: Link = {

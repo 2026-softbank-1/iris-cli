@@ -74,6 +74,26 @@ describe("runLink", () => {
     expect(await findLink(cwd())).toBeNull();
   });
 
+  it("프로젝트가_하나도_없으면_대시보드에서_만들라고_안내하고_저장하지_않는다", async () => {
+    await loginAs();
+    const { fetchImpl } = fakeFetch([envelope({ items: [], total: 0, page: 0, size: 100 })]);
+
+    await expect(runLink({}, { fetchImpl, cwd: cwd(), log: vi.fn() })).rejects.toThrow(
+      "프로젝트가 없습니다. 대시보드에서 프로젝트를 먼저 만들어 주세요.",
+    );
+    expect(await findLink(cwd())).toBeNull();
+  });
+
+  it("서비스가_하나도_없으면_GitHub_레포를_연결해_만들라고_안내하고_저장하지_않는다", async () => {
+    await loginAs();
+    const { fetchImpl } = fakeFetch([projects(), envelope([])]);
+
+    await expect(runLink({ project: "demo" }, { fetchImpl, cwd: cwd(), log: vi.fn() })).rejects.toThrow(
+      "'demo' 프로젝트에 서비스가 없습니다. 서비스는 대시보드에서 GitHub 레포를 연결해 만들며, 레포가 없으면 만들 수 없습니다.",
+    );
+    expect(await findLink(cwd())).toBeNull();
+  });
+
   it("로그인_전이면_login_안내", async () => {
     await expect(runLink({}, { cwd: cwd(), log: vi.fn() })).rejects.toThrow("likelion login");
   });
