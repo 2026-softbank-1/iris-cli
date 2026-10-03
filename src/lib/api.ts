@@ -9,9 +9,18 @@ interface ApiEnvelope<T> {
 
 export type QueryValue = string | number | undefined;
 
+/** 파일 업로드처럼 JSON 이 아니라 원본 바이트를 그대로 보내는 본문. */
+export interface StreamBody {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+  contentLength: number;
+}
+
 export interface RequestOptions {
   token?: string;
   body?: unknown;
+  stream?: StreamBody;
+  headers?: Record<string, string>;
   query?: Record<string, QueryValue>;
   signal?: AbortSignal;
 }
@@ -48,17 +57,28 @@ export class ApiClient {
     accept: string,
     options: RequestOptions,
   ): Promise<Response> {
-    const headers: Record<string, string> = { Accept: accept };
+    const headers: Record<string, string> = { Accept: accept, ...options.headers };
     if (options.token) headers.Authorization = `Bearer ${options.token}`;
-    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
+    let body: RequestInit["body"];
+    if (options.stream) {
+      headers["Content-Type"] = options.stream.contentType;
+      headers["Content-Length"] = String(options.stream.contentLength);
+      body = options.stream.body;
+    } else if (options.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(options.body);
+    }
 
     try {
       return await this.fetchImpl(`${this.baseUrl}/api/v1${path}${queryString(options.query)}`, {
         method,
         headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body,
+        // 스트림 본문은 duplex 를 명시해야 한다.
+        ...(options.stream ? { duplex: "half" } : {}),
         signal: options.signal,
-      });
+      } as RequestInit);
     } catch (error) {
       if (options.signal?.aborted) throw error;
       throw new ConnectionError(this.baseUrl);

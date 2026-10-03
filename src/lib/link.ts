@@ -14,13 +14,19 @@ export interface Link {
   serviceName: string;
 }
 
-/** 현재 폴더에서 위로 올라가며 연결 정보를 찾는다. 없으면 null. */
-export async function findLink(startDir: string): Promise<Link | null> {
+export interface LinkLocation {
+  link: Link;
+  /** `.likelion` 이 들어 있는 폴더. `up` 이 이 폴더를 통째로 올린다. */
+  dir: string;
+}
+
+/** 현재 폴더에서 위로 올라가며 연결 정보와 그 위치를 찾는다. 없으면 null. */
+export async function findLinkLocation(startDir: string): Promise<LinkLocation | null> {
   let dir = resolve(startDir);
   for (;;) {
     const path = join(dir, LINK_DIR, LINK_FILE);
     try {
-      return JSON.parse(await readFile(path, "utf8")) as Link;
+      return { link: JSON.parse(await readFile(path, "utf8")) as Link, dir };
     } catch (error) {
       if (error instanceof SyntaxError) throw new CliError(`연결 파일이 손상되었습니다: ${path}`);
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -41,13 +47,25 @@ export async function saveLink(dir: string, link: Link): Promise<string> {
   return path;
 }
 
-export async function requireLink(startDir: string, credentials: Credentials): Promise<Link> {
-  const link = await findLink(startDir);
-  if (!link) throw new CliError("연결된 서비스가 없습니다. `likelion link` 를 실행해 주세요.");
-  if (link.apiUrl !== credentials.apiUrl) {
+/** 현재 폴더에서 위로 올라가며 연결 정보를 찾는다. 없으면 null. */
+export async function findLink(startDir: string): Promise<Link | null> {
+  return (await findLinkLocation(startDir))?.link ?? null;
+}
+
+export async function requireLinkLocation(
+  startDir: string,
+  credentials: Credentials,
+): Promise<LinkLocation> {
+  const location = await findLinkLocation(startDir);
+  if (!location) throw new CliError("연결된 서비스가 없습니다. `likelion link` 를 실행해 주세요.");
+  if (location.link.apiUrl !== credentials.apiUrl) {
     throw new CliError(
-      `이 폴더는 ${link.apiUrl} 에 연결돼 있는데 로그인은 ${credentials.apiUrl} 입니다. \`likelion link\` 를 다시 실행해 주세요.`,
+      `이 폴더는 ${location.link.apiUrl} 에 연결돼 있는데 로그인은 ${credentials.apiUrl} 입니다. \`likelion link\` 를 다시 실행해 주세요.`,
     );
   }
-  return link;
+  return location;
+}
+
+export async function requireLink(startDir: string, credentials: Credentials): Promise<Link> {
+  return (await requireLinkLocation(startDir, credentials)).link;
 }
