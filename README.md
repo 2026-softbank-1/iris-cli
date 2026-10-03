@@ -37,6 +37,28 @@
 
 `logs -f` 는 과거 로그를 먼저 보여 준 뒤 그 마지막 시각부터 SSE 로 이어 받는다. 서버가 5분마다 연결을 끊으므로 마지막 `id` 를 커서로 다시 연결하고, 겹쳐 오는 줄은 한 번만 찍는다. 서버가 `overflow`·`error` 이벤트를 보내면 다시 연결하지 않고 끝낸다. `logs` 는 런타임 로그만 다룬다. 빌드 로그는 서버에 별도 API(`.../deployments/{deploymentId}/build-logs`)가 있지만 CLI 는 아직 쓰지 않는다.
 
+## 설치
+
+Node.js 20 이상이 필요하다. [Releases](https://github.com/2026-softbank-1/iris-cli/releases) 에 올라온 `likelion-<버전>.tgz` 를 설치한다. npm 에는 올리지 않는다(이름 `likelion` 을 다른 패키지가 쓰고 있다).
+
+```bash
+npm install -g https://github.com/2026-softbank-1/iris-cli/releases/download/v0.2.0/likelion-0.2.0.tgz
+likelion --version
+```
+
+- 업데이트: 새 버전의 `.tgz` 주소로 같은 명령을 다시 실행한다.
+- 삭제: `npm uninstall -g likelion`.
+- 처음 쓰는 순서: `likelion login` → 배포할 폴더에서 `likelion link` → `likelion up`. 서비스는 대시보드에서 GitHub 레포를 연결해 먼저 만들어 둬야 한다.
+
+## 릴리스
+
+GitHub Actions 로 자동화하지 않았다. 버전을 올릴 때 손으로 한다.
+
+1. `npm version <버전> --no-git-tag-version` 으로 `package.json`·`package-lock.json` 을 올리고 PR 로 `main` 에 병합한다.
+2. 병합된 `main` 에서 `npm ci && npm run build && npm pack` 으로 `likelion-<버전>.tgz` 를 만든다.
+3. `gh release create v<버전> likelion-<버전>.tgz --target <main 커밋> --title "v<버전>" --notes "<변경 내용>"` 으로 릴리스를 만든다.
+4. 위 설치 명령의 주소를 새 버전으로 바꾼 뒤 설치해 `likelion --version` 이 맞는지 확인한다.
+
 ## 개발
 
 Node.js 20 이상이 필요하다.
