@@ -91,6 +91,27 @@ describe("runStatus", () => {
     expect(log).toHaveBeenCalledWith("단계  QUEUED 0.0s → DEPLOYING 21s → SUCCEEDED");
   });
 
+  it("CLI_로_올린_배포는_upload_식별자를_자르지_않고_보여_준다", async () => {
+    await loginAs();
+    await linkTo(cwd());
+    const uploaded = {
+      ...latest,
+      sourceSha: "upload-46cce13380d1",
+      sourceCommitMessage: undefined,
+      triggerType: "CLI",
+    };
+    const { fetchImpl } = fakeFetch([
+      envelope({ id: 3, projectId: 1, name: "web", targetIds: [1], latestDeployment: uploaded }),
+      envelope([]),
+      envelope({ ...uploaded, stages: [] }),
+    ]);
+    const log = vi.fn();
+
+    await runStatus({ fetchImpl, cwd: cwd(), log });
+
+    expect(log).toHaveBeenCalledWith("커밋  upload-46cce13380d1");
+  });
+
   it("배포_이력이_없으면_그렇다고_알려_준다", async () => {
     await loginAs();
     await linkTo(cwd());

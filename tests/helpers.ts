@@ -108,7 +108,10 @@ export interface RecordedCall {
   method: string;
   url: string;
   headers: Record<string, string>;
+  /** JSON 본문 */
   body?: unknown;
+  /** 스트림으로 보낸 본문의 바이트 */
+  rawBody?: Buffer;
 }
 
 /** 응답(또는 던질 오류)을 순서대로 돌려주고 호출을 기록하는 fetch 대역. */
@@ -119,15 +122,20 @@ export function fakeFetch(responses: (Response | Error)[]): {
   const calls: RecordedCall[] = [];
   const queue = [...responses];
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({
+    const call: RecordedCall = {
       method: init?.method ?? "GET",
       url: String(input),
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
-    });
+    };
+    calls.push(call);
     const next = queue.shift();
     if (!next) throw new Error("fakeFetch: 준비된 응답이 없습니다");
     if (next instanceof Error) throw next;
+    const body = init?.body;
+    if (body && typeof body !== "string") {
+      call.rawBody = Buffer.from(await new Response(body).arrayBuffer());
+    }
     return next;
   }) as typeof fetch;
   return { fetchImpl, calls };

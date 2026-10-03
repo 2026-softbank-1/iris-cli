@@ -22,6 +22,15 @@ export function formatSeconds(seconds: number): string {
   return `${Math.floor(rounded / 60)}m${rounded % 60}s`;
 }
 
+const UPLOAD_SOURCE_PREFIX = "upload-";
+
+/** Git SHA 는 앞 7자만 남긴다. `up` 으로 올린 배포의 `upload-…` 는 잘리면 뜻이 없어 그대로 둔다. */
 export function shortSha(sha: string): string {
-  return sha.slice(0, 7);
+  return sha.startsWith(UPLOAD_SOURCE_PREFIX) ? sha : sha.slice(0, 7);
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

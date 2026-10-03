@@ -6,6 +6,7 @@ import { runLogout } from "./commands/logout.js";
 import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
 import { runStatus } from "./commands/status.js";
+import { runUp } from "./commands/up.js";
 import { runWhoami } from "./commands/whoami.js";
 import { DEFAULT_API_URL, resolveApiUrl } from "./lib/config.js";
 import { createAsk } from "./lib/prompt.js";
@@ -82,6 +83,14 @@ export function buildProgram(): Command {
     .option("--no-browser", "브라우저를 열지 않고 주소만 출력한다")
     .action(async (options: { target?: string; browser: boolean }) => {
       await runOpen(options);
+    });
+
+  program
+    .command("up")
+    .description("연결된 폴더를 올려 배포한다")
+    .option("--detach", "배포 요청만 보내고 끝까지 기다리지 않는다", false)
+    .action(async (options: { detach: boolean }) => {
+      await runUp(options);
     });
 
   return program;
