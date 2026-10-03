@@ -43,12 +43,14 @@ export interface PickOptions {
   value: string | undefined;
   ask: Ask | undefined;
   log: (message: string) => void;
+  /** 목록이 비었을 때 보여 줄 안내. 없으면 "목록이 비어 있습니다." 만 알린다. */
+  emptyMessage?: string;
 }
 
 /** 옵션이 있으면 그 값으로, 하나뿐이면 자동으로, 아니면 번호를 물어 고른다. */
 export async function pickOne<T extends Choice>(items: T[], options: PickOptions): Promise<T> {
-  const { label, flag, value, ask, log } = options;
-  if (items.length === 0) throw new CliError(`${label} 목록이 비어 있습니다.`);
+  const { label, flag, value, ask, log, emptyMessage } = options;
+  if (items.length === 0) throw new CliError(emptyMessage ?? `${label} 목록이 비어 있습니다.`);
 
   if (value !== undefined) {
     const found = matchByIdOrName(items, value);
