@@ -36,3 +36,27 @@ describe("ApiClient 의 Retry-After", () => {
     expect(error.retryAfterSeconds).toBeUndefined();
   });
 });
+
+describe("ApiClient 의 본문 없는 응답과 검증 실패", () => {
+  it("204_는_봉투_없이_성공으로_본다", async () => {
+    const { fetchImpl } = fakeFetch([new Response(null, { status: 204 })]);
+
+    await expect(new ApiClient("https://api.example.test", fetchImpl).request("DELETE", "/x")).resolves.toBeUndefined();
+  });
+
+  it("검증_실패의_details_를_오류에_담는다", async () => {
+    const error = await failureOf(
+      new Response(
+        JSON.stringify({
+          success: false,
+          code: "VALIDATION_ERROR",
+          message: "request validation failed",
+          details: [{ field: "name", reason: "too long" }],
+        }),
+        { status: 422 },
+      ),
+    );
+
+    expect(error.details).toEqual([{ field: "name", reason: "too long" }]);
+  });
+});

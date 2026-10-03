@@ -5,6 +5,12 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
+import {
+  runServersAdd,
+  runServersList,
+  runServersRemove,
+  runServersToken,
+} from "./commands/servers.js";
 import { runStatus } from "./commands/status.js";
 import { runUp } from "./commands/up.js";
 import { runWhoami } from "./commands/whoami.js";
@@ -93,5 +99,54 @@ export function buildProgram(): Command {
       await runUp(options);
     });
 
+  const servers = program.command("servers").description("배포 대상으로 붙인 내 서버(온프레미스)를 관리한다");
+
+  servers
+    .command("list", { isDefault: true })
+    .description("내 서버 목록과 연결 상태를 보여 준다")
+    .action(async () => {
+      await runServersList();
+    });
+
+  servers
+    .command("add")
+    .description("서버를 등록하고 서버에서 실행할 설치 명령을 보여 준다")
+    .argument("<name>", "서버 이름 (1~63자)")
+    .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
+    .action(async (name: string, options: { wait: boolean }) => {
+      await withInterrupt((signal) => runServersAdd({ name, wait: options.wait }, { signal }));
+    });
+
+  servers
+    .command("token")
+    .description("등록 토큰을 다시 발급해 새 설치 명령을 보여 준다")
+    .argument("<server>", "서버 이름 또는 id")
+    .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
+    .action(async (server: string, options: { wait: boolean }) => {
+      await withInterrupt((signal) => runServersToken({ server, wait: options.wait }, { signal }));
+    });
+
+  servers
+    .command("remove")
+    .alias("rm")
+    .description("서버를 삭제한다")
+    .argument("<server>", "서버 이름 또는 id")
+    .option("-y, --yes", "묻지 않고 삭제한다", false)
+    .action(async (server: string, options: { yes: boolean }) => {
+      await runServersRemove({ server, yes: options.yes }, { ask: createAsk() });
+    });
+
   return program;
+}
+
+/** Ctrl+C 를 한 번 누르면 signal 로 알려 정리하고 끝내게 한다. 두 번째는 원래대로 바로 끝난다. */
+async function withInterrupt<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const onInterrupt = () => controller.abort();
+  process.once("SIGINT", onInterrupt);
+  try {
+    return await run(controller.signal);
+  } finally {
+    process.off("SIGINT", onInterrupt);
+  }
 }

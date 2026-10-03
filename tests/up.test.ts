@@ -31,15 +31,23 @@ const detail = (status: string, extra: Record<string, unknown> = {}) =>
   });
 // 게이트웨이가 봉투 없이 돌려주는 504
 const gatewayTimeout = () => new Response("Gateway Timeout", { status: 504 });
+// 묶기 전에 확인하는 서비스·타깃. 기본은 공용 aws 타깃이라 항상 배포할 수 있다.
+const serviceInfo = (targetIds = [1]) =>
+  envelope({ id: 3, projectId: 1, name: "web", targetIds, sourceRepositoryUrl: "x", sourceBranch: "main" });
+const targets = () =>
+  envelope([
+    { id: 1, name: "aws", kind: "AWS" },
+    { id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, connectionStatus: "PENDING" },
+  ]);
 const domains = () =>
   envelope([{ targetId: 1, targetName: "aws", isConnected: true, url: "https://web-3.likelion.uk" }]);
 
-async function setup(responses: (Response | Error)[]) {
+async function setup(responses: (Response | Error)[], preflight: Response[] = [serviceInfo(), targets()]) {
   await loginAs();
   await linkTo(cwd());
   await mkdir(join(cwd(), "src"), { recursive: true });
   await writeFile(join(cwd(), "src", "index.js"), "console.log('hi')");
-  const { fetchImpl, calls } = fakeFetch(responses);
+  const { fetchImpl, calls: allCalls } = fakeFetch([...preflight, ...responses]);
   let clock = 0;
   const log = vi.fn();
   const warn = vi.fn();
@@ -48,7 +56,18 @@ async function setup(responses: (Response | Error)[]) {
   });
   const deps: UpDeps = { fetchImpl, cwd: cwd(), log, warn, sleep, now: () => clock };
   const lines = () => log.mock.calls.map(([line]) => line);
-  return { calls, log, warn, sleep, deps, lines };
+  return {
+    // 묶기 전 확인 호출은 빼고 업로드부터 센다.
+    get calls() {
+      return allCalls.slice(preflight.length);
+    },
+    allCalls,
+    log,
+    warn,
+    sleep,
+    deps,
+    lines,
+  };
 }
 
 describe("runUp", () => {
@@ -221,6 +240,50 @@ describe("runUp", () => {
     expect(t.calls).toHaveLength(3);
     expect(t.sleep).not.toHaveBeenCalled();
     expect(t.warn).not.toHaveBeenCalled();
+  });
+
+  it("묶기_전에_서비스와_타깃을_확인한다", async () => {
+    const t = await setup([upload(), created()]);
+
+    await runUp({ detach: true }, t.deps);
+
+    expect(t.allCalls.slice(0, 2).map((call) => new URL(call.url).pathname)).toEqual([
+      "/api/v1/services/3",
+      "/api/v1/targets",
+    ]);
+  });
+
+  it("타깃_서버가_연결되기_전이면_서버_이름과_상태를_알리고_올리지_않는다", async () => {
+    const t = await setup([], [
+      serviceInfo([7]),
+      targets(),
+      envelope({ id: 3, name: "home-lab", serverKey: "k3x9q2ma", status: "PENDING", targetId: 7, createdAt: "2026-10-04T00:00:00Z" }),
+    ]);
+
+    const failure = runUp({ detach: false }, t.deps);
+
+    await expect(failure).rejects.toThrow("배포 타깃 서버 home-lab 이 아직 연결되지 않았습니다 (대기)");
+    await expect(failure).rejects.toThrow("likelion servers");
+    expect(new URL(t.allCalls[2]?.url ?? "").pathname).toBe("/api/v1/onprem-servers/3");
+    expect(t.calls).toHaveLength(0);
+  });
+
+  it("타깃_서버가_연결됐으면_그대로_배포한다", async () => {
+    const connected = () =>
+      envelope([{ id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, connectionStatus: "CONNECTED" }]);
+    const t = await setup([upload(), created()], [serviceInfo([7]), connected()]);
+
+    await runUp({ detach: true }, t.deps);
+
+    expect(t.calls).toHaveLength(2);
+  });
+
+  it("서버가_배포를_TARGET_NOT_CONNECTED_로_거절하면_servers_안내로_끝낸다", async () => {
+    const t = await setup([upload(), errorEnvelope(409, "TARGET_NOT_CONNECTED", "target is not connected")]);
+
+    await expect(runUp({ detach: false }, t.deps)).rejects.toThrow(
+      "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
+    );
   });
 
   it("연결되지_않은_폴더면_link_안내", async () => {

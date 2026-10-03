@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { matchByIdOrName, pickOne } from "../src/lib/prompt.js";
+import { confirm, matchByIdOrName, pickOne } from "../src/lib/prompt.js";
 
 const items = [
   { id: 1, name: "alpha" },
@@ -67,5 +67,40 @@ describe("pickOne", () => {
     await expect(pickOne([], { ...base, value: undefined, ask: undefined })).rejects.toThrow(
       "비어 있습니다",
     );
+  });
+});
+
+describe("pickOne 의 describeItem", () => {
+  it("번호_목록을_주어진_설명으로_보여_준다", async () => {
+    const log = vi.fn();
+    const ask = vi.fn().mockResolvedValue("2");
+
+    const picked = await pickOne(items, {
+      label: "타깃",
+      flag: "--target",
+      value: undefined,
+      ask,
+      log,
+      describeItem: (item) => `${item.name}!`,
+    });
+
+    expect(picked.name).toBe("beta");
+    expect(log.mock.calls.map(([line]) => line)).toEqual(["  1) alpha!", "  2) beta!"]);
+  });
+});
+
+describe("confirm", () => {
+  it.each([
+    ["y", false, true],
+    ["YES", false, true],
+    ["n", true, false],
+    ["", true, true],
+    ["", false, false],
+    ["maybe", true, false],
+  ])("답_%j_기본_%s_면_%s", async (answer, defaultYes, expected) => {
+    const ask = vi.fn().mockResolvedValue(answer);
+
+    expect(await confirm(ask, "지울까요?", defaultYes)).toBe(expected);
+    expect(ask).toHaveBeenCalledWith(`지울까요? ${defaultYes ? "(Y/n)" : "(y/N)"} `);
   });
 });

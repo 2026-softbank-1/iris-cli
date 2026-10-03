@@ -1,10 +1,11 @@
-import { ApiError, CliError, ConnectionError } from "./errors.js";
+import { ApiError, type ApiErrorDetail, CliError, ConnectionError } from "./errors.js";
 
 interface ApiEnvelope<T> {
   success: boolean;
   code?: string;
   message?: string;
   data?: T;
+  details?: ApiErrorDetail[];
 }
 
 export type QueryValue = string | number | undefined;
@@ -39,6 +40,8 @@ export class ApiClient {
 
   async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
     const response = await this.send(method, path, "application/json", options);
+    // 삭제처럼 본문 없이 끝나는 성공(204)에는 봉투가 없다.
+    if (response.status === 204) return undefined as T;
     const envelope = await parseEnvelope<T>(response);
     if (!response.ok || !envelope?.success) throw failure(response, envelope, options.token);
     return envelope.data as T;
@@ -106,6 +109,7 @@ function failure(
     response.status,
     envelope?.code,
     retryAfterSeconds(response),
+    envelope?.details,
   );
 }
 

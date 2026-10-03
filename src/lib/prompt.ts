@@ -47,9 +47,17 @@ export interface PickOptions {
   emptyMessage?: string;
 }
 
+export interface PickOneOptions<T> extends PickOptions {
+  /** 번호 목록에 보여 줄 한 줄. 없으면 `이름 (id)` */
+  describeItem?: (item: T) => string;
+}
+
 /** 옵션이 있으면 그 값으로, 하나뿐이면 자동으로, 아니면 번호를 물어 고른다. */
-export async function pickOne<T extends Choice>(items: T[], options: PickOptions): Promise<T> {
-  const { label, flag, value, ask, log, emptyMessage } = options;
+export async function pickOne<T extends Choice>(
+  items: T[],
+  options: PickOneOptions<T>,
+): Promise<T> {
+  const { label, flag, value, ask, log, emptyMessage, describeItem } = options;
   if (items.length === 0) throw new CliError(emptyMessage ?? `${label} 목록이 비어 있습니다.`);
 
   if (value !== undefined) {
@@ -71,9 +79,18 @@ export async function pickOne<T extends Choice>(items: T[], options: PickOptions
       `대화형 터미널이 아니라 ${label} 을 고를 수 없습니다. ${flag} 로 지정해 주세요. 가능한 값: ${describe(items)}`,
     );
   }
-  items.forEach((item, index) => log(`  ${index + 1}) ${item.name} (${item.id})`));
+  items.forEach((item, index) =>
+    log(`  ${index + 1}) ${describeItem ? describeItem(item) : `${item.name} (${item.id})`}`),
+  );
   const answer = Number((await ask(`${label} 번호: `)).trim());
   const picked = Number.isInteger(answer) ? items[answer - 1] : undefined;
   if (!picked) throw new CliError("잘못된 선택입니다.");
   return picked;
+}
+
+/** 예·아니오를 묻는다. 빈 답은 기본값이고, `y`·`yes` 만 예로 본다. */
+export async function confirm(ask: Ask, question: string, defaultYes: boolean): Promise<boolean> {
+  const answer = (await ask(`${question} ${defaultYes ? "(Y/n)" : "(y/N)"} `)).trim().toLowerCase();
+  if (answer === "") return defaultYes;
+  return answer === "y" || answer === "yes";
 }

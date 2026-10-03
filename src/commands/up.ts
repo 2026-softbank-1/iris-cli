@@ -2,11 +2,23 @@ import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import type { ApiClient, FetchLike } from "../lib/api.js";
 import { createArchive } from "../lib/archive.js";
-import { ApiError, CliError, ConnectionError } from "../lib/errors.js";
+import {
+  ApiError,
+  CliError,
+  describeTransientFailure,
+  isTransientFailure,
+} from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { requireLinkLocation } from "../lib/link.js";
+import { serverStatusLabel } from "../lib/onprem.js";
 import { requireSession } from "../lib/session.js";
-import type { DeploymentDetail, ServiceDomain } from "../lib/types.js";
+import type {
+  DeploymentDetail,
+  OnpremServer,
+  Service,
+  ServiceDomain,
+  Target,
+} from "../lib/types.js";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_WAIT_MS = 20 * 60_000;
@@ -60,6 +72,8 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const { link, dir } = await requireLinkLocation(deps.cwd ?? process.cwd(), credentials);
   const token = credentials.token;
+  // 묶고 올리기 전에 배포할 수 있는 타깃인지 본다. 연결 전 서버는 서버도 배포 요청을 거절한다.
+  await ensureTargetConnected(api, token, link.serviceId);
 
   log(`${link.projectName} / ${link.serviceName} 에 올릴 소스를 묶는 중...`);
   const archive = await createArchive(dir, { maxBytes: deps.maxArchiveBytes });
@@ -79,15 +93,25 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
       },
     });
 
-    const deployment = await api.request<DeploymentRequest>(
-      "POST",
-      `/services/${link.serviceId}/deployments`,
-      {
-        token,
-        body: { triggerType: "CLI", uploadId: upload.uploadId },
-        headers: { "Idempotency-Key": `up-${upload.uploadId}` },
-      },
-    );
+    let deployment: DeploymentRequest;
+    try {
+      deployment = await api.request<DeploymentRequest>(
+        "POST",
+        `/services/${link.serviceId}/deployments`,
+        {
+          token,
+          body: { triggerType: "CLI", uploadId: upload.uploadId },
+          headers: { "Idempotency-Key": `up-${upload.uploadId}` },
+        },
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "TARGET_NOT_CONNECTED") {
+        throw new CliError(
+          "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
+        );
+      }
+      throw error;
+    }
     log(`배포 요청 #${deployment.id} (${deployment.status})`);
     if (options.detach) {
       log("기다리지 않고 끝냅니다. 진행 상황은 `likelion status` 로 확인하세요.");
@@ -105,6 +129,29 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
   } finally {
     await archive.cleanup();
   }
+}
+
+async function ensureTargetConnected(api: ApiClient, token: string, serviceId: number): Promise<void> {
+  const [service, targets] = await Promise.all([
+    api.request<Service>("GET", `/services/${serviceId}`, { token }),
+    api.request<Target[]>("GET", "/targets", { token }),
+  ]);
+  const blocked = targets.find(
+    (target) =>
+      service.targetIds.includes(target.id) &&
+      target.connectionStatus !== undefined &&
+      target.connectionStatus !== "CONNECTED",
+  );
+  if (!blocked?.connectionStatus) return;
+
+  const server =
+    blocked.onpremServerId === undefined
+      ? undefined
+      : await api.request<OnpremServer>("GET", `/onprem-servers/${blocked.onpremServerId}`, { token });
+  const name = server?.name ?? blocked.name;
+  throw new CliError(
+    `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요. 상태는 \`likelion servers\` 로 확인합니다.`,
+  );
 }
 
 interface Clock {
@@ -156,16 +203,6 @@ async function waitForDeployment(
     }
     await clock.sleep(failures > 0 ? (RETRY_DELAYS_MS[failures - 1] ?? POLL_INTERVAL_MS) : POLL_INTERVAL_MS);
   }
-}
-
-function isTransientFailure(error: unknown): error is ConnectionError | ApiError {
-  return error instanceof ConnectionError || (error instanceof ApiError && error.status >= 500);
-}
-
-function describeTransientFailure(error: ConnectionError | ApiError): string {
-  return error instanceof ApiError
-    ? `서버가 일시적으로 응답하지 못했습니다 (HTTP ${error.status}).`
-    : "서버에 닿지 못했습니다.";
 }
 
 async function reportResult(
