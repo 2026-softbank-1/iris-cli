@@ -45,8 +45,18 @@ export async function runStatus(deps: StatusDeps = {}): Promise<void> {
   }
 }
 
+// 끝난 상태의 단계에는 종료 시각이 없어 소요 시간도 없다. 진행 중으로 읽히지 않게 상태만 보여 준다.
+const TERMINAL_STATUSES = new Set([
+  "SUCCEEDED",
+  "FAILED",
+  "ROLLED_BACK",
+  "MANUAL_INTERVENTION",
+  "SUPERSEDED",
+]);
+
 function describeStage(stage: DeploymentStage): string {
-  const duration =
-    stage.durationSeconds === undefined ? "진행 중" : formatSeconds(stage.durationSeconds);
-  return `${stage.status} ${duration}`;
+  if (stage.durationSeconds !== undefined) {
+    return `${stage.status} ${formatSeconds(stage.durationSeconds)}`;
+  }
+  return TERMINAL_STATUSES.has(stage.status) ? stage.status : `${stage.status} 진행 중`;
 }

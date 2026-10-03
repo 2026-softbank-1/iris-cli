@@ -69,6 +69,28 @@ describe("runStatus", () => {
     expect(lines).toContain("사유  BUILD_FAILED");
   });
 
+  it("끝난_배포의_마지막_단계는_진행_중으로_표시하지_않는다", async () => {
+    await loginAs();
+    await linkTo(cwd());
+    const { fetchImpl } = fakeFetch([
+      envelope({ id: 3, projectId: 1, name: "web", targetIds: [1], latestDeployment: latest }),
+      envelope([]),
+      envelope({
+        ...latest,
+        stages: [
+          { status: "QUEUED", startedAt: "2026-10-03T00:00:00Z", durationSeconds: 0 },
+          { status: "DEPLOYING", startedAt: "2026-10-03T00:00:00Z", durationSeconds: 21 },
+          { status: "SUCCEEDED", startedAt: "2026-10-03T00:00:21Z" },
+        ],
+      }),
+    ]);
+    const log = vi.fn();
+
+    await runStatus({ fetchImpl, cwd: cwd(), log });
+
+    expect(log).toHaveBeenCalledWith("단계  QUEUED 0.0s → DEPLOYING 21s → SUCCEEDED");
+  });
+
   it("배포_이력이_없으면_그렇다고_알려_준다", async () => {
     await loginAs();
     await linkTo(cwd());
