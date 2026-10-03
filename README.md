@@ -12,6 +12,11 @@
 | `likelion logs [-f] [--since 1h] [-n 200] [--search <text>] [--target <id\|name>]` | 런타임 로그를 보여 주고 `-f` 면 새 로그를 계속 따라간다 | 구현됨 (빌드 로그 제외) |
 | `likelion open [--target <id\|name>] [--no-browser]` | 배포된 서비스 주소를 브라우저로 연다 | 구현됨 |
 | `likelion up [--detach]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 운영 서버에서 `up` 한 번으로 배포 확인 |
+| `likelion services create [--project] [--repo] [--name] [--branch] [--root-dir] [--target] [--link\|--no-link]` | GitHub 저장소를 연결해 서비스를 만들고, 원하면 현재 폴더를 연결한다 | 구현됨 ([계약](docs/onprem-servers-contract.md)) |
+| `likelion servers` | 내 서버(온프레미스) 목록과 연결 상태를 보여 준다 | 구현됨 ([계약](docs/onprem-servers-contract.md)), 서버 API 는 iris-was 에서 구현 중 |
+| `likelion servers add <name> [--no-wait]` | 서버를 등록하고 서버에서 실행할 설치 명령을 보여 준 뒤 연결될 때까지 기다린다 | 위와 같음 |
+| `likelion servers token <name\|id> [--no-wait]` | 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다 | 위와 같음 |
+| `likelion servers remove <name\|id> [--yes]` | 서버를 삭제한다 (`rm` 도 된다) | 위와 같음 |
 
 ## 연결(`link`)
 
@@ -24,6 +29,39 @@
 - 폴더 밖을 가리키는 심볼릭 링크는 빼고 알려 준다. 압축한 크기 한도는 250 MB 이고(서버 소스 스냅샷 한도와 같다), 넘으면 올리기 전에 멈춘다.
 - 올린 뒤 `CLI` 배포 요청을 만들고 2초마다 상태를 확인해 `SUCCEEDED`·`FAILED` 등으로 끝날 때까지 보여 준다(최대 20분). `--detach` 면 요청만 보내고 끝낸다. 서버에는 빌드 로그 API(`GET /services/{id}/deployments/{deploymentId}/build-logs`)가 생겼지만 CLI 가 아직 쓰지 않아 빌드 중에는 상태만 보인다. 일시적인 서버 오류(5xx)·연결 끊김은 연속 5회까지 2~5초씩 늘려 가며 다시 확인하고, 넘으면 배포 번호와 `likelion status` 안내를 남기고 끝낸다. 4xx 는 다시 시도하지 않는다.
 
+## 내 서버(`servers`)
+
+내 Ubuntu 서버(22.04/24.04, x86_64·arm64)를 배포 대상으로 붙인다. 서버 쪽 동작은 iris-was 의 [온프레미스 서버 등록 계약](https://github.com/2026-softbank-1/iris-was/blob/main/docs/onprem-server-registration-contract.md)을 따른다.
+
+```text
+$ likelion servers add home-lab
+서버를 등록했습니다: home-lab (서버 키 k3x9q2ma)
+
+서버에서 실행하세요 (Ubuntu 22.04/24.04, sudo):
+
+  curl -fsSL https://api.likelion.uk/api/v1/onprem-servers/install.sh | sudo bash -s -- --token <토큰>
+
+이 명령의 토큰은 2026-10-05T03:00:00Z 까지 유효하고 지금 한 번만 보여 줍니다.
+만료되면 `likelion servers token home-lab` 으로 다시 발급하세요.
+
+서버에서 명령을 실행하면 연결을 확인합니다. 기다리는 중... (Ctrl+C 로 멈춰도 등록은 남습니다)
+  대기 (+0s)
+  연결 중 (+96s)
+  연결됨 (+171s)
+서버가 연결되었습니다: home-lab (iris-k3x9q2ma.tailb046e8.ts.net)
+```
+
+- 상태는 대기(`PENDING`) → 연결 중(`REGISTERING`) → 연결됨(`CONNECTED`) / 실패(`FAILED`) 다. 실패하거나 토큰이 만료되면 `servers token` 으로 다시 발급해 서버에서 명령을 다시 실행한다.
+- 등록 토큰은 설치 명령 안에서 한 번만 보인다. 기다리는 동안 3초마다 상태를 확인하고, `--no-wait` 면 명령만 보여 주고 끝낸다.
+- 삭제는 서비스가 붙어 있지 않은 서버만 된다. 서버에 설치된 K3s·Tailscale 은 지우지 않는다.
+- 연결된 서버에 배포하려면 `likelion services create --target home-lab` 으로 서비스를 만든다. 연결 전 서버도 고를 수 있지만 경고하고, `up` 은 서버가 연결될 때까지 배포하지 않는다.
+
+## 서비스 만들기(`services create`)
+
+- 저장소는 `--repo` 로 주고, 없으면 현재 폴더의 git `origin` 을 쓴다(대화형이면 확인을 묻는다). `https://github.com/owner/repo`·`git@github.com:owner/repo.git`·`owner/repo` 를 받는다. GitHub App 이 그 저장소에 설치돼 있어야 한다.
+- 이름은 저장소 이름, 브랜치는 저장소 기본 브랜치, 타깃은 `aws` 가 기본이다. 대화형이면 프로젝트·타깃을 목록에서 고른다(내 서버는 연결 상태를 같이 보여 준다).
+- 만든 뒤 현재 폴더를 연결할지 묻는다. `--link` 면 묻지 않고 연결하고, `--no-link` 나 비대화형이면 연결하지 않고 `link` 명령을 안내한다.
+
 ## 사용하는 API
 
 | 명령 | 엔드포인트 |
@@ -33,7 +71,9 @@
 | `logs` | `GET /services/{id}/logs` · `GET /services/{id}/logs/stream`(SSE) · `GET /targets` |
 | `login` | `POST /auth/cli/sessions` · `POST /auth/cli/sessions/{sessionId}/token`(폴링, `429` 면 `Retry-After` 만큼 쉬고 재시도) · `GET /me` |
 | `open` | `GET /services/{id}/domains` |
-| `up` | `POST /services/{id}/uploads`(본문 = tar.gz) · `POST /services/{id}/deployments`(`triggerType=CLI`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `up` | `GET /services/{id}` · `GET /targets`(타깃 서버 연결 확인) · `POST /services/{id}/uploads`(본문 = tar.gz) · `POST /services/{id}/deployments`(`triggerType=CLI`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `services create` | `GET /projects` · `GET /targets` · `GET /onprem-servers` · `POST /projects/{id}/services` |
+| `servers` | `GET /onprem-servers` · `POST /onprem-servers` · `GET /onprem-servers/{id}`(폴링) · `POST /onprem-servers/{id}/registration-token` · `DELETE /onprem-servers/{id}` |
 
 `logs -f` 는 과거 로그를 먼저 보여 준 뒤 그 마지막 시각부터 SSE 로 이어 받는다. 서버가 5분마다 연결을 끊으므로 마지막 `id` 를 커서로 다시 연결하고, 겹쳐 오는 줄은 한 번만 찍는다. 서버가 `overflow`·`error` 이벤트를 보내면 다시 연결하지 않고 끝낸다. `logs` 는 런타임 로그만 다룬다. 빌드 로그는 서버에 별도 API(`.../deployments/{deploymentId}/build-logs`)가 있지만 CLI 는 아직 쓰지 않는다.
 
@@ -48,7 +88,7 @@ likelion --version
 
 - 업데이트: 새 버전의 `.tgz` 주소로 같은 명령을 다시 실행한다.
 - 삭제: `npm uninstall -g likelion`.
-- 처음 쓰는 순서: `likelion login` → 배포할 폴더에서 `likelion link` → `likelion up`. 서비스는 대시보드에서 GitHub 레포를 연결해 먼저 만들어 둬야 한다.
+- 처음 쓰는 순서: `likelion login` → 배포할 폴더에서 `likelion services create`(또는 대시보드에서 만든 뒤 `likelion link`) → `likelion up`. 서비스는 GitHub 레포를 연결해 만든다.
 
 ## 릴리스
 
