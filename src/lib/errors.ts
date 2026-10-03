@@ -23,6 +23,8 @@ export class ApiError extends CliError {
     message: string,
     readonly status: number,
     readonly code?: string,
+    /** `Retry-After` 헤더가 초 단위 숫자일 때 그 값. 429 에서 얼마나 쉴지 알려 준다. */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";

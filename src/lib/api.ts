@@ -85,7 +85,14 @@ function failure(
     envelope?.message ?? `요청이 실패했습니다 (HTTP ${response.status})`,
     response.status,
     envelope?.code,
+    retryAfterSeconds(response),
   );
+}
+
+/** `Retry-After` 는 초 단위 숫자만 읽는다. 날짜 형식이거나 없으면 undefined. */
+function retryAfterSeconds(response: Response): number | undefined {
+  const value = response.headers.get("Retry-After")?.trim();
+  return value && /^\d+$/.test(value) ? Number(value) : undefined;
 }
 
 async function parseEnvelope<T>(response: Response): Promise<ApiEnvelope<T> | null> {

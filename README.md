@@ -4,7 +4,7 @@
 
 | 명령 | 설명 | 상태 |
 |---|---|---|
-| `likelion login` | 브라우저에서 GitHub 로그인을 승인하면 토큰을 받아 저장한다 | 구현됨 (서버 API 대기, [계약](docs/login-contract.md)) |
+| `likelion login` | 브라우저에서 GitHub 로그인을 승인하면 토큰을 받아 저장한다 | 구현됨 ([계약](docs/login-contract.md), 운영 서버에서 확인) |
 | `likelion whoami` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
 | `likelion logout` | 저장된 로그인 정보를 지운다 | 구현됨 |
 | `likelion link [--project <id\|name>] [--service <id\|name>]` | 프로젝트·서비스를 골라 현재 폴더에 연결한다 | 구현됨 |
@@ -24,6 +24,7 @@
 | `link` | `GET /projects` · `GET /projects/{id}/services` |
 | `status` | `GET /services/{id}` · `GET /services/{id}/domains` · `GET /services/{id}/deployments/{deploymentId}` |
 | `logs` | `GET /services/{id}/logs` · `GET /services/{id}/logs/stream`(SSE) · `GET /targets` |
+| `login` | `POST /auth/cli/sessions` · `POST /auth/cli/sessions/{sessionId}/token`(폴링, `429` 면 `Retry-After` 만큼 쉬고 재시도) · `GET /me` |
 | `open` | `GET /services/{id}/domains` |
 
 `logs -f` 는 과거 로그를 먼저 보여 준 뒤 그 마지막 시각부터 SSE 로 이어 받는다. 서버가 5분마다 연결을 끊으므로 마지막 `id` 를 커서로 다시 연결하고, 겹쳐 오는 줄은 한 번만 찍는다. 서버가 `overflow`·`error` 이벤트를 보내면 다시 연결하지 않고 끝낸다. 서버 로그 API 는 CodeBuild 빌드 로그를 제공하지 않아서 `logs` 는 런타임 로그만 다룬다.
