@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import type { ApiClient, FetchLike } from "../lib/api.js";
 import { createArchive } from "../lib/archive.js";
-import { CliError, ConnectionError } from "../lib/errors.js";
+import { ApiError, CliError, ConnectionError } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { requireLinkLocation } from "../lib/link.js";
 import { requireSession } from "../lib/session.js";
@@ -10,7 +10,9 @@ import type { DeploymentDetail, ServiceDomain } from "../lib/types.js";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_WAIT_MS = 20 * 60_000;
+// 연속으로 이만큼까지는 다시 확인하고, 넘으면 멈춘다. 쉬는 시간은 실패가 이어질수록 늘린다.
 const MAX_POLL_FAILURES = 5;
+const RETRY_DELAYS_MS = [2000, 3000, 4000, 5000, 5000];
 const TERMINAL_STATUSES = new Set([
   "SUCCEEDED",
   "FAILED",
@@ -140,18 +142,33 @@ async function waitForDeployment(
       }
       if (TERMINAL_STATUSES.has(detail.status)) return detail;
     } catch (error) {
-      if (!(error instanceof ConnectionError)) throw error;
+      // 배포 요청은 이미 서버에 있다. 일시적인 실패(5xx·연결 끊김)만 다시 확인하고, 4xx 같은 나머지는 바로 끝낸다.
+      if (!isTransientFailure(error)) throw error;
       failures += 1;
-      if (failures > MAX_POLL_FAILURES) throw error;
-      clock.warn("서버에 닿지 못했습니다. 다시 확인합니다.");
+      if (failures > MAX_POLL_FAILURES) {
+        throw new CliError(
+          `배포 #${deploymentId} 의 상태를 연속 ${failures}회 확인하지 못해 기다리기를 멈춥니다 (마지막 오류: ${error.message}). 배포는 계속 진행 중일 수 있습니다. \`likelion status\` 로 확인해 주세요.`,
+        );
+      }
+      clock.warn(`${describeTransientFailure(error)} 다시 확인합니다 (${failures}/${MAX_POLL_FAILURES}).`);
     }
     if (clock.now() - startedAt >= MAX_WAIT_MS) {
       throw new CliError(
         "배포가 20분 안에 끝나지 않아 기다리기를 멈춥니다. `likelion status` 로 확인해 주세요.",
       );
     }
-    await clock.sleep(POLL_INTERVAL_MS);
+    await clock.sleep(failures > 0 ? (RETRY_DELAYS_MS[failures - 1] ?? POLL_INTERVAL_MS) : POLL_INTERVAL_MS);
   }
+}
+
+function isTransientFailure(error: unknown): error is ConnectionError | ApiError {
+  return error instanceof ConnectionError || (error instanceof ApiError && error.status >= 500);
+}
+
+function describeTransientFailure(error: ConnectionError | ApiError): string {
+  return error instanceof ApiError
+    ? `서버가 일시적으로 응답하지 못했습니다 (HTTP ${error.status}).`
+    : "서버에 닿지 못했습니다.";
 }
 
 async function reportResult(

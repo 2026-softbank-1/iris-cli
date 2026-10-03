@@ -29,6 +29,8 @@ const detail = (status: string, extra: Record<string, unknown> = {}) =>
     stages: [],
     ...extra,
   });
+// 게이트웨이가 봉투 없이 돌려주는 504
+const gatewayTimeout = () => new Response("Gateway Timeout", { status: 504 });
 const domains = () =>
   envelope([{ targetId: 1, targetName: "aws", isConnected: true, url: "https://web-3.likelion.uk" }]);
 
@@ -141,6 +143,82 @@ describe("runUp", () => {
 
     expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("다시 확인"));
     expect(t.lines()).toContain("배포가 완료되었습니다.");
+  });
+
+  it("폴링_중_5xx_가_한두_번_나도_점점_늘려_쉬며_끝까지_진행한다", async () => {
+    const t = await setup([
+      upload(),
+      created(),
+      detail("BUILDING"),
+      gatewayTimeout(),
+      errorEnvelope(502, "BAD_GATEWAY", "bad gateway"),
+      detail("SUCCEEDED"),
+      domains(),
+    ]);
+
+    await runUp({ detach: false }, t.deps);
+
+    expect(t.warn).toHaveBeenCalledTimes(2);
+    expect(t.warn).toHaveBeenNthCalledWith(1, expect.stringContaining("HTTP 504"));
+    expect(t.warn).toHaveBeenNthCalledWith(2, expect.stringContaining("HTTP 502"));
+    expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 2000, 3000]);
+    expect(t.lines()).toContain("배포가 완료되었습니다.");
+  });
+
+  it("폴링_중_연속_5xx_가_한도를_넘으면_배포_번호와_status_안내로_끝낸다", async () => {
+    const t = await setup([upload(), created(), ...Array.from({ length: 6 }, gatewayTimeout)]);
+
+    const failure = runUp({ detach: false }, t.deps);
+
+    await expect(failure).rejects.toThrow("#12");
+    await expect(failure).rejects.toThrow("배포는 계속 진행 중일 수 있습니다");
+    await expect(failure).rejects.toThrow("likelion status");
+    expect(t.calls).toHaveLength(8);
+    expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 3000, 4000, 5000, 5000]);
+  });
+
+  it("폴링_중_연결_오류가_한도를_넘어도_같은_안내로_끝낸다", async () => {
+    const t = await setup([
+      upload(),
+      created(),
+      ...Array.from({ length: 6 }, () => new Error("blip")),
+    ]);
+
+    const failure = runUp({ detach: false }, t.deps);
+
+    await expect(failure).rejects.toThrow("#12");
+    await expect(failure).rejects.toThrow("likelion status");
+  });
+
+  it("폴링이_한_번_성공하면_연속_실패_횟수를_다시_센다", async () => {
+    const t = await setup([
+      upload(),
+      created(),
+      ...Array.from({ length: 5 }, gatewayTimeout),
+      detail("BUILDING"),
+      ...Array.from({ length: 5 }, gatewayTimeout),
+      detail("SUCCEEDED"),
+      domains(),
+    ]);
+
+    await runUp({ detach: false }, t.deps);
+
+    expect(t.warn).toHaveBeenCalledTimes(10);
+    expect(t.lines()).toContain("배포가 완료되었습니다.");
+  });
+
+  it.each([401, 403, 404])("폴링_중_%i_는_다시_시도하지_않고_바로_끝낸다", async (status) => {
+    const t = await setup([
+      upload(),
+      created(),
+      errorEnvelope(status, "NOPE", "배포를 확인할 수 없습니다"),
+    ]);
+
+    await expect(runUp({ detach: false }, t.deps)).rejects.toThrow();
+
+    expect(t.calls).toHaveLength(3);
+    expect(t.sleep).not.toHaveBeenCalled();
+    expect(t.warn).not.toHaveBeenCalled();
   });
 
   it("연결되지_않은_폴더면_link_안내", async () => {
