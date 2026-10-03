@@ -57,9 +57,11 @@ export interface Target {
   name: string;
   kind?: string;
   /** 사용자가 등록한 서버의 타깃이면 그 서버 id. 공용 타깃은 없다. */
-  onpremServerId?: number;
+  onpremServerId?: number | null;
+  /** 서버 타깃이면 그 서버 이름. 이 필드가 없는 서버는 `GET /onprem-servers` 로 찾는다. */
+  onpremServerName?: string | null;
   /** 서버 타깃의 연결 상태. 공용 타깃은 없다(항상 배포할 수 있다). */
-  connectionStatus?: OnpremServerStatus;
+  connectionStatus?: OnpremServerStatus | null;
 }
 
 export type OnpremServerStatus = "PENDING" | "REGISTERING" | "CONNECTED" | "FAILED";
@@ -70,10 +72,10 @@ export interface OnpremServer {
   serverKey: string;
   status: OnpremServerStatus;
   targetId: number;
-  tailnetFqdn?: string;
-  failureCode?: string;
-  registrationExpiresAt?: string;
-  connectedAt?: string;
+  tailnetFqdn?: string | null;
+  failureCode?: string | null;
+  registrationExpiresAt?: string | null;
+  connectedAt?: string | null;
   createdAt: string;
 }
 

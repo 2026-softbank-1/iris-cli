@@ -268,6 +268,28 @@ describe("runUp", () => {
     expect(t.calls).toHaveLength(0);
   });
 
+  it("타깃에_서버_이름이_있으면_서버를_다시_조회하지_않는다", async () => {
+    const named = () =>
+      envelope([
+        { id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, onpremServerName: "home-lab", connectionStatus: "REGISTERING" },
+      ]);
+    const t = await setup([], [serviceInfo([7]), named()]);
+
+    await expect(runUp({ detach: false }, t.deps)).rejects.toThrow(
+      "배포 타깃 서버 home-lab 이 아직 연결되지 않았습니다 (연결 중)",
+    );
+    expect(t.allCalls).toHaveLength(2);
+  });
+
+  it("connectionStatus_가_null_인_공용_타깃은_그대로_배포한다", async () => {
+    const shared = () => envelope([{ id: 1, name: "aws", kind: "AWS", onpremServerId: null, connectionStatus: null }]);
+    const t = await setup([upload(), created()], [serviceInfo([1]), shared()]);
+
+    await runUp({ detach: true }, t.deps);
+
+    expect(t.calls).toHaveLength(2);
+  });
+
   it("타깃_서버가_연결됐으면_그대로_배포한다", async () => {
     const connected = () =>
       envelope([{ id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, connectionStatus: "CONNECTED" }]);

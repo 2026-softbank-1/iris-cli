@@ -113,8 +113,9 @@ export function buildProgram(): Command {
     .command("add")
     .description("서버를 등록하고 서버에서 실행할 설치 명령을 보여 준다")
     .argument("<name>", "서버 이름 (1~63자)")
+    .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
     .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
-    .action(async (name: string, options: { wait: boolean }) => {
+    .action(async (name: string, options: { wait?: boolean }) => {
       await withInterrupt((signal) => runServersAdd({ name, wait: options.wait }, { signal }));
     });
 
@@ -122,8 +123,9 @@ export function buildProgram(): Command {
     .command("token")
     .description("등록 토큰을 다시 발급해 새 설치 명령을 보여 준다")
     .argument("<server>", "서버 이름 또는 id")
+    .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
     .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
-    .action(async (server: string, options: { wait: boolean }) => {
+    .action(async (server: string, options: { wait?: boolean }) => {
       await withInterrupt((signal) => runServersToken({ server, wait: options.wait }, { signal }));
     });
 

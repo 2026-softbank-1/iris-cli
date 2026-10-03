@@ -139,19 +139,21 @@ async function ensureTargetConnected(api: ApiClient, token: string, serviceId: n
   const blocked = targets.find(
     (target) =>
       service.targetIds.includes(target.id) &&
-      target.connectionStatus !== undefined &&
+      target.connectionStatus != null &&
       target.connectionStatus !== "CONNECTED",
   );
   if (!blocked?.connectionStatus) return;
 
-  const server =
-    blocked.onpremServerId === undefined
-      ? undefined
-      : await api.request<OnpremServer>("GET", `/onprem-servers/${blocked.onpremServerId}`, { token });
-  const name = server?.name ?? blocked.name;
+  const name = blocked.onpremServerName ?? (await findServerName(api, token, blocked)) ?? blocked.name;
   throw new CliError(
     `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요. 상태는 \`likelion servers\` 로 확인합니다.`,
   );
+}
+
+async function findServerName(api: ApiClient, token: string, target: Target): Promise<string | undefined> {
+  if (target.onpremServerId == null) return undefined;
+  const server = await api.request<OnpremServer>("GET", `/onprem-servers/${target.onpremServerId}`, { token });
+  return server.name;
 }
 
 interface Clock {

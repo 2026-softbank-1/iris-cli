@@ -50,7 +50,10 @@ async function setup(responses: (Response | Error)[], extra: Partial<ServersDeps
   const deps: ServersDeps = { fetchImpl, log, warn, sleep, now: () => clock, ...extra };
   const lines = () => log.mock.calls.map(([line]) => String(line));
   const pathOf = (index: number) => new URL(calls[index]?.url ?? "").pathname;
-  return { calls, log, warn, sleep, deps, lines, pathOf };
+  const advance = (ms: number) => {
+    clock += ms;
+  };
+  return { calls, log, warn, sleep, deps, lines, pathOf, advance };
 }
 
 describe("runServersList", () => {
@@ -142,6 +145,43 @@ describe("runServersAdd", () => {
     expect(t.calls).toHaveLength(1);
     expect(t.sleep).not.toHaveBeenCalled();
     expect(t.lines().at(-1)).toBe("연결 상태는 `likelion servers` 로 확인하세요.");
+  });
+
+  it("대화형이_아니면_기본으로_기다리지_않는다", async () => {
+    const t = await setup([registration()], { isInteractive: false });
+
+    await runServersAdd({ name: "home-lab" }, t.deps);
+
+    expect(t.calls).toHaveLength(1);
+    expect(t.sleep).not.toHaveBeenCalled();
+    expect(t.lines().at(-1)).toBe("연결 상태는 `likelion servers` 로 확인하세요.");
+  });
+
+  it("대화형이면_기본으로_기다리고_wait_를_주면_대화형이_아니어도_기다린다", async () => {
+    const interactive = await setup([registration(), envelope(server({ status: "CONNECTED" }))], {
+      isInteractive: true,
+    });
+    await runServersAdd({ name: "home-lab" }, interactive.deps);
+    expect(interactive.calls).toHaveLength(2);
+
+    const forced = await setup([registration(), envelope(server({ status: "CONNECTED" }))], {
+      isInteractive: false,
+    });
+    await runServersAdd({ name: "home-lab", wait: true }, forced.deps);
+    expect(forced.calls).toHaveLength(2);
+  });
+
+  it("20분이_지나도_연결되지_않으면_기다리기를_멈추고_servers_로_이어서_확인하라고_안내한다", async () => {
+    const t = await setup([registration(), envelope(server()), envelope(server({ status: "REGISTERING" }))]);
+    t.sleep.mockImplementation(async () => t.advance(10 * 60_000));
+
+    const result = await runServersAdd({ name: "home-lab", wait: true }, t.deps);
+
+    expect(result.status).toBe("REGISTERING");
+    expect(t.calls).toHaveLength(3);
+    expect(t.lines().at(-1)).toBe(
+      "20분 동안 연결되지 않아 기다리기를 멈춥니다. 연결 확인은 `likelion servers` 로 계속할 수 있습니다.",
+    );
   });
 
   it("연결이_실패하면_사유와_토큰_재발급을_안내한다", async () => {

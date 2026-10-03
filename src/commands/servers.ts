@@ -12,6 +12,8 @@ import { requireSession } from "../lib/session.js";
 import type { OnpremServer, OnpremServerRegistration } from "../lib/types.js";
 
 const POLL_INTERVAL_MS = 3000;
+// 서버에서 설치를 마치는 데 넉넉한 시간. 넘으면 기다리기만 멈추고 등록은 둔다.
+const MAX_WAIT_MS = 20 * 60_000;
 // 연속으로 이만큼까지는 다시 확인하고, 넘으면 멈춘다. 쉬는 시간은 실패가 이어질수록 늘린다.
 const MAX_POLL_FAILURES = 5;
 const RETRY_DELAYS_MS = [3000, 4000, 5000, 5000, 5000];
@@ -27,6 +29,8 @@ export interface ServersDeps {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Ctrl+C 로 연결 기다리기를 멈춘다. 서버 등록은 그대로 남는다. */
   signal?: AbortSignal;
+  /** 대화형 터미널인지. 아니면(파이프·CI) 기본으로 연결을 기다리지 않는다 */
+  isInteractive?: boolean;
 }
 
 /** 내 서버 목록을 보여 준다. */
@@ -56,8 +60,8 @@ export async function runServersList(deps: ServersDeps = {}): Promise<OnpremServ
 
 export interface ServersAddOptions {
   name: string;
-  /** 등록한 뒤 연결될 때까지 상태를 따라간다 */
-  wait: boolean;
+  /** 등록한 뒤 연결될 때까지 상태를 따라간다. 없으면 대화형 터미널에서만 기다린다 */
+  wait?: boolean;
 }
 
 /** 서버를 등록하고 설치 명령을 보여 준 뒤, 기본으로는 연결될 때까지 상태를 따라간다. */
@@ -93,7 +97,7 @@ export async function runServersAdd(
   const { server } = registration;
   log(`서버를 등록했습니다: ${server.name} (서버 키 ${server.serverKey})`);
   printInstallCommand(registration, log);
-  if (!options.wait) {
+  if (!shouldWait(options.wait, deps)) {
     log("연결 상태는 `likelion servers` 로 확인하세요.");
     return server;
   }
@@ -103,7 +107,8 @@ export async function runServersAdd(
 export interface ServersTokenOptions {
   /** 서버 이름 또는 id */
   server: string;
-  wait: boolean;
+  /** 연결될 때까지 상태를 따라간다. 없으면 대화형 터미널에서만 기다린다 */
+  wait?: boolean;
 }
 
 /** 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다. 대기·실패 상태의 서버만 된다. */
@@ -134,7 +139,7 @@ export async function runServersToken(
 
   log(`새 등록 토큰을 발급했습니다: ${server.name}. 이전 명령은 더 이상 쓸 수 없습니다.`);
   printInstallCommand(registration, log);
-  if (!options.wait) {
+  if (!shouldWait(options.wait, deps)) {
     log("연결 상태는 `likelion servers` 로 확인하세요.");
     return registration.server;
   }
@@ -204,6 +209,10 @@ async function findServer(
   });
 }
 
+function shouldWait(option: boolean | undefined, deps: ServersDeps): boolean {
+  return option ?? deps.isInteractive ?? process.stdin.isTTY === true;
+}
+
 function describeStatus(server: OnpremServer): string {
   const label = serverStatusLabel(server.status);
   return server.failureCode ? `${label} (${server.failureCode})` : label;
@@ -255,6 +264,10 @@ async function waitForConnection(
       );
     }
 
+    if (now() - startedAt >= MAX_WAIT_MS) {
+      log("20분 동안 연결되지 않아 기다리기를 멈춥니다. 연결 확인은 `likelion servers` 로 계속할 수 있습니다.");
+      return server;
+    }
     if (signal?.aborted) return stopWaiting(server);
     await sleep(failures > 0 ? (RETRY_DELAYS_MS[failures - 1] ?? POLL_INTERVAL_MS) : POLL_INTERVAL_MS, signal);
     if (signal?.aborted) return stopWaiting(server);

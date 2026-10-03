@@ -134,6 +134,25 @@ describe("runServicesCreate", () => {
     expect(t.calls[3]?.body).toMatchObject({ targetIds: [7] });
   });
 
+  it("타깃에_서버_이름이_있으면_서버_목록을_부르지_않고_null_필드는_공용_타깃으로_본다", async () => {
+    const t = await setup([
+      projects(),
+      envelope([
+        { id: 1, name: "aws", kind: "AWS", onpremServerId: null, onpremServerName: null, connectionStatus: null },
+        { id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, onpremServerName: "home-lab", connectionStatus: "CONNECTED" },
+      ]),
+      created(),
+    ]);
+    const ask = vi.fn().mockResolvedValueOnce("2");
+
+    await runServicesCreate({ project: "demo", repo: REPO, link: false }, { ...t.deps, ask });
+
+    expect(t.lines()).toEqual(expect.arrayContaining(["  1) aws (공용)", "  2) home-lab (내 서버, 연결됨)"]));
+    expect(t.pathOf(2)).toBe("/api/v1/projects/1/services");
+    expect(t.calls[2]?.body).toMatchObject({ targetIds: [7] });
+    expect(t.warn).not.toHaveBeenCalled();
+  });
+
   it("내_서버가_없으면_서버_목록을_부르지_않는다", async () => {
     const t = await setup([projects(), envelope([{ id: 1, name: "aws", kind: "AWS" }]), created({ targetIds: [1] })]);
 

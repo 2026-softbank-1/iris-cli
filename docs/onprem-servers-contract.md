@@ -38,20 +38,21 @@ CLI                                          Control API                사용�
 |---|---|---|
 | `servers` (`list`) | `GET /onprem-servers` | 표로 보여 준다. 빈 목록이면 `servers add` 를 안내한다 |
 | `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 `ONPREM_SERVER_NAME_CONFLICT` → 같은 이름 안내(다른 409 는 서버 메시지를 붙여 안내), 422 → 1~63자 안내 |
-| `servers add`·`token` 의 기다리기 | `GET /onprem-servers/{id}` | 3초마다. 상태가 바뀔 때만 찍는다. `CONNECTED` 면 성공, `FAILED` 면 `failureCode` 와 `servers token` 안내로 실패. 5xx·연결 끊김은 연속 5회까지 다시 확인하고, 4xx 는 바로 끝낸다. Ctrl+C 면 등록은 남는다고 알리고 끝낸다. `--no-wait` 면 부르지 않는다 |
+| `servers add`·`token` 의 기다리기 | `GET /onprem-servers/{id}` | 3초마다. 상태가 바뀔 때만 찍는다. `CONNECTED` 면 성공, `FAILED` 면 `failureCode` 와 `servers token` 안내로 실패. 5xx·연결 끊김은 연속 5회까지 다시 확인하고, 4xx 는 바로 끝낸다. Ctrl+C 나 20분이 지나면 등록은 남는다고 알리고 끝낸다. 대화형 터미널이 아니면 기본으로 부르지 않는다(`--wait`·`--no-wait` 로 바꾼다) |
 | `servers token <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `POST /onprem-servers/{id}/registration-token` → `{server, registrationToken, installCommand}` | 409 `INVALID_STATUS_TRANSITION` → 대기·실패 상태에서만 된다고 안내 |
 | `servers remove <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `DELETE /onprem-servers/{id}` → 204 | 확인을 묻는다(`--yes` 면 생략, 비대화형이면 `--yes` 필수). 409 `ONPREM_SERVER_IN_USE` → 서비스를 먼저 지우라고 안내 |
 | `services create` | `GET /projects` · `GET /targets` · (서버 타깃이 있으면) `GET /onprem-servers` · `POST /projects/{projectId}/services` | 아래 참고 |
-| `up` | `GET /services/{id}` · `GET /targets` · (연결 전이면) `GET /onprem-servers/{id}` | 아래 참고 |
+| `up` | `GET /services/{id}` · `GET /targets` · (연결 전이고 `onpremServerName` 이 없으면) `GET /onprem-servers/{id}` | 아래 참고 |
 
 ### `GET /targets` 에 더해진 필드
 
 | 필드 | 뜻 |
 |---|---|
 | `onpremServerId` | 내 서버의 타깃이면 서버 id. 공용 타깃은 없다 |
+| `onpremServerName` | 서버 타깃이면 서버 이름. 있으면 `GET /onprem-servers` 를 부르지 않는다 |
 | `connectionStatus` | 서버 타깃의 연결 상태(`OnpremServer.status` 와 같은 코드). 공용 타깃은 없다(항상 배포할 수 있다) |
 
-목록은 공용 타깃 + 내 서버 타깃만 온다. CLI 는 서버 타깃을 타깃 이름(`onprem-<serverKey>`) 대신 `GET /onprem-servers` 의 서버 이름으로 보여 준다. `--target` 은 서버 이름·타깃 이름·타깃 id 를 모두 받는다.
+목록은 공용 타깃 + 내 서버 타깃만 온다. CLI 는 서버 타깃을 타깃 이름(`onprem-<serverKey>`) 대신 서버 이름(`onpremServerName`, 없으면 `GET /onprem-servers`)으로 보여 준다. 값이 없는 필드는 빠지거나 null 로 오므로 둘 다 없는 것으로 본다. `--target` 은 서버 이름·타깃 이름·타깃 id 를 모두 받는다.
 
 ### `POST /projects/{projectId}/services`
 

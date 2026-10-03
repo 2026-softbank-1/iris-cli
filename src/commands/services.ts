@@ -131,17 +131,20 @@ async function pickTarget(
   if (value === undefined && !ask) return undefined;
 
   const targets = await api.request<Target[]>("GET", "/targets", { token });
-  const hasServers = targets.some((target) => target.onpremServerId !== undefined);
-  const servers = hasServers
+  // 서버 이름이 응답에 없는 서버 타깃이 있을 때만 서버 목록을 부른다.
+  const isNameMissing = targets.some(
+    (target) => target.onpremServerId != null && target.onpremServerName == null,
+  );
+  const servers = isNameMissing
     ? await api.request<OnpremServer[]>("GET", "/onprem-servers", { token })
     : [];
   const serverNameById = new Map(servers.map((server) => [server.id, server.name]));
   const choices: TargetChoice[] = targets.map((target) => ({
     id: target.id,
     name:
-      target.onpremServerId === undefined
+      target.onpremServerId == null
         ? target.name
-        : (serverNameById.get(target.onpremServerId) ?? target.name),
+        : (target.onpremServerName ?? serverNameById.get(target.onpremServerId) ?? target.name),
     target,
   }));
 
@@ -168,14 +171,14 @@ async function pickTarget(
 
 function describeChoice(choice: TargetChoice): string {
   const status = choice.target.connectionStatus;
-  return status === undefined
+  return status == null
     ? `${choice.name} (공용)`
     : `${choice.name} (내 서버, ${serverStatusLabel(status)})`;
 }
 
 function warnIfNotConnected(choice: TargetChoice, warn: (message: string) => void): void {
   const status = choice.target.connectionStatus;
-  if (status === undefined || status === "CONNECTED") return;
+  if (status == null || status === "CONNECTED") return;
   warn(
     `서버 ${choice.name} 은 아직 연결되지 않았습니다 (${serverStatusLabel(status)}). 서비스는 만들지만 연결되기 전에는 배포할 수 없습니다. \`likelion servers\` 로 상태를 확인하세요.`,
   );

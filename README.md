@@ -14,8 +14,8 @@
 | `likelion up [--detach]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 운영 서버에서 `up` 한 번으로 배포 확인 |
 | `likelion services create [--project] [--repo] [--name] [--branch] [--root-dir] [--target] [--link\|--no-link]` | GitHub 저장소를 연결해 서비스를 만들고, 원하면 현재 폴더를 연결한다 | 구현됨 ([계약](docs/onprem-servers-contract.md)) |
 | `likelion servers` | 내 서버(온프레미스) 목록과 연결 상태를 보여 준다 | 구현됨 ([계약](docs/onprem-servers-contract.md)), 서버 API 는 iris-was 에서 구현 중 |
-| `likelion servers add <name> [--no-wait]` | 서버를 등록하고 서버에서 실행할 설치 명령을 보여 준 뒤 연결될 때까지 기다린다 | 위와 같음 |
-| `likelion servers token <name\|id> [--no-wait]` | 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다 | 위와 같음 |
+| `likelion servers add <name> [--wait\|--no-wait]` | 서버를 등록하고 서버에서 실행할 설치 명령을 보여 준 뒤 연결될 때까지 기다린다 | 위와 같음 |
+| `likelion servers token <name\|id> [--wait\|--no-wait]` | 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다 | 위와 같음 |
 | `likelion servers remove <name\|id> [--yes]` | 서버를 삭제한다 (`rm` 도 된다) | 위와 같음 |
 
 ## 연결(`link`)
@@ -52,7 +52,7 @@ $ likelion servers add home-lab
 ```
 
 - 상태는 대기(`PENDING`) → 연결 중(`REGISTERING`) → 연결됨(`CONNECTED`) / 실패(`FAILED`) 다. 실패하거나 토큰이 만료되면 `servers token` 으로 다시 발급해 서버에서 명령을 다시 실행한다.
-- 등록 토큰은 설치 명령 안에서 한 번만 보인다. 기다리는 동안 3초마다 상태를 확인하고, `--no-wait` 면 명령만 보여 주고 끝낸다.
+- 등록 토큰은 설치 명령 안에서 한 번만 보인다. 대화형 터미널이면 3초마다 상태를 확인하며 최대 20분 기다리고, 파이프·CI 에서는 명령만 보여 주고 끝낸다. `--wait`·`--no-wait` 로 바꾼다.
 - 삭제는 서비스가 붙어 있지 않은 서버만 된다. 서버에 설치된 K3s·Tailscale 은 지우지 않는다.
 - 연결된 서버에 배포하려면 `likelion services create --target home-lab` 으로 서비스를 만든다. 연결 전 서버도 고를 수 있지만 경고하고, `up` 은 서버가 연결될 때까지 배포하지 않는다.
 
