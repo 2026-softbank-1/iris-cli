@@ -1,10 +1,9 @@
 import type { FetchLike } from "../lib/api.js";
 import { type Link, saveLink } from "../lib/link.js";
+import { pickProject } from "../lib/project.js";
 import { type Ask, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
-import type { Page, Project, Service } from "../lib/types.js";
-
-const PROJECT_PAGE_SIZE = 100;
+import type { Service } from "../lib/types.js";
 
 export interface LinkOptions {
   project?: string;
@@ -24,18 +23,7 @@ export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promis
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
 
-  const projects = await api.request<Page<Project>>("GET", "/projects", {
-    token,
-    query: { page: 0, size: PROJECT_PAGE_SIZE },
-  });
-  const project = await pickOne(projects.items, {
-    label: "프로젝트",
-    flag: "--project",
-    value: options.project,
-    ask: deps.ask,
-    log,
-    emptyMessage: "프로젝트가 없습니다. 대시보드에서 프로젝트를 먼저 만들어 주세요.",
-  });
+  const project = await pickProject(api, token, options.project, deps.ask, log);
 
   const services = await api.request<Service[]>("GET", `/projects/${project.id}/services`, {
     token,
@@ -46,7 +34,7 @@ export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promis
     value: options.service,
     ask: deps.ask,
     log,
-    emptyMessage: `'${project.name}' 프로젝트에 서비스가 없습니다. 서비스는 대시보드에서 GitHub 레포를 연결해 만들며, 레포가 없으면 만들 수 없습니다. 서비스를 만든 뒤 다시 실행해 주세요.`,
+    emptyMessage: `'${project.name}' 프로젝트에 서비스가 없습니다. 서비스는 대시보드나 \`likelion services create --repo <GitHub 주소>\` 로 GitHub 레포를 연결해 만들며, 레포가 없으면 만들 수 없습니다. 서비스를 만든 뒤 다시 실행해 주세요.`,
   });
 
   const link: Link = {

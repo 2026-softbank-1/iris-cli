@@ -11,6 +11,7 @@ import {
   runServersRemove,
   runServersToken,
 } from "./commands/servers.js";
+import { runServicesCreate, type ServicesCreateOptions } from "./commands/services.js";
 import { runStatus } from "./commands/status.js";
 import { runUp } from "./commands/up.js";
 import { runWhoami } from "./commands/whoami.js";
@@ -134,6 +135,23 @@ export function buildProgram(): Command {
     .option("-y, --yes", "묻지 않고 삭제한다", false)
     .action(async (server: string, options: { yes: boolean }) => {
       await runServersRemove({ server, yes: options.yes }, { ask: createAsk() });
+    });
+
+  const services = program.command("services").description("서비스를 관리한다");
+
+  services
+    .command("create")
+    .description("GitHub 저장소를 연결해 서비스를 만든다")
+    .option("--project <id|name>", "서비스를 만들 프로젝트 (생략하면 목록에서 고른다)")
+    .option("--repo <url>", "GitHub 저장소 주소 (생략하면 현재 폴더의 git origin)")
+    .option("--name <name>", "서비스 이름 (생략하면 저장소 이름)")
+    .option("--branch <branch>", "배포할 브랜치 (생략하면 저장소 기본 브랜치)")
+    .option("--root-dir <path>", "저장소 안의 서비스 위치 (생략하면 저장소 루트)")
+    .option("--target <name|id>", "배포 타깃: aws 같은 공용 타깃 또는 내 서버 이름 (생략하면 고르거나 aws)")
+    .option("--link", "만든 뒤 묻지 않고 현재 폴더를 연결한다")
+    .option("--no-link", "현재 폴더를 연결하지 않는다")
+    .action(async (options: ServicesCreateOptions) => {
+      await runServicesCreate(options, { ask: createAsk() });
     });
 
   return program;
