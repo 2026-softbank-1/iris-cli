@@ -80,6 +80,8 @@ describe("runUp", () => {
     const lines = t.lines();
     expect(lines).toContain("배포 요청 #12 (QUEUED)");
     expect(lines.filter((line) => line.includes("BUILDING"))).toHaveLength(1);
+    // 빌드 로그를 지원하지 않는다는 낡은 안내는 더 이상 찍지 않는다.
+    expect(lines.filter((line) => line.includes("빌드 로그"))).toEqual([]);
     expect(lines).toContain("  DEPLOYING (+4s)");
     expect(lines).toContain("  SUCCEEDED (+6s)");
     expect(lines).toContain("배포가 완료되었습니다.");

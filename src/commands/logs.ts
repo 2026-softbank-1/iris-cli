@@ -36,7 +36,7 @@ class StreamFatalError extends CliError {}
 
 /**
  * 서비스 런타임 로그를 보여 준다. 먼저 과거 로그를 조회하고, `follow` 면 그 뒤부터 SSE 로 이어 받는다.
- * 빌드 로그는 서버 API 가 제공하지 않는다.
+ * 런타임 로그만 다룬다. 빌드 로그는 별도 API(`.../build-logs`)라 아직 쓰지 않는다.
  */
 export async function runLogs(options: LogsOptions, deps: LogsDeps = {}): Promise<void> {
   const log = deps.log ?? console.log;

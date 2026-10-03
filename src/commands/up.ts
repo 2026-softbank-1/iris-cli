@@ -135,9 +135,6 @@ async function waitForDeployment(
       if (detail.status !== lastStatus) {
         const elapsed = Math.round((clock.now() - startedAt) / 1000);
         clock.log(`  ${detail.status} (+${elapsed}s)`);
-        if (detail.status === "BUILDING") {
-          clock.log("  빌드 로그는 아직 지원하지 않아 진행 상태만 보여 줍니다.");
-        }
         lastStatus = detail.status;
       }
       if (TERMINAL_STATUSES.has(detail.status)) return detail;

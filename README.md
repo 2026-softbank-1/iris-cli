@@ -22,7 +22,7 @@
 - `.likelion` 이 있는 폴더를 통째로 올린다. 하위 폴더에서 실행해도 같다.
 - `.git`·`node_modules`·`.likelion`·`.DS_Store`·`.env`(`.env.example` 은 포함)는 항상 뺀다. 루트의 `.gitignore`·`.likelionignore` 도 따르고, `.likelionignore` 에 `!.env` 처럼 적어 다시 넣을 수 있다. 하위 폴더의 `.gitignore` 는 읽지 않는다.
 - 폴더 밖을 가리키는 심볼릭 링크는 빼고 알려 준다. 압축한 크기 한도는 250 MB 이고(서버 소스 스냅샷 한도와 같다), 넘으면 올리기 전에 멈춘다.
-- 올린 뒤 `CLI` 배포 요청을 만들고 2초마다 상태를 확인해 `SUCCEEDED`·`FAILED` 등으로 끝날 때까지 보여 준다(최대 20분). `--detach` 면 요청만 보내고 끝낸다. 서버에 빌드 로그 API 가 아직 없어 빌드 중에는 상태만 보인다. 일시적인 서버 오류(5xx)·연결 끊김은 연속 5회까지 2~5초씩 늘려 가며 다시 확인하고, 넘으면 배포 번호와 `likelion status` 안내를 남기고 끝낸다. 4xx 는 다시 시도하지 않는다.
+- 올린 뒤 `CLI` 배포 요청을 만들고 2초마다 상태를 확인해 `SUCCEEDED`·`FAILED` 등으로 끝날 때까지 보여 준다(최대 20분). `--detach` 면 요청만 보내고 끝낸다. 서버에는 빌드 로그 API(`GET /services/{id}/deployments/{deploymentId}/build-logs`)가 생겼지만 CLI 가 아직 쓰지 않아 빌드 중에는 상태만 보인다. 일시적인 서버 오류(5xx)·연결 끊김은 연속 5회까지 2~5초씩 늘려 가며 다시 확인하고, 넘으면 배포 번호와 `likelion status` 안내를 남기고 끝낸다. 4xx 는 다시 시도하지 않는다.
 
 ## 사용하는 API
 
@@ -35,7 +35,7 @@
 | `open` | `GET /services/{id}/domains` |
 | `up` | `POST /services/{id}/uploads`(본문 = tar.gz) · `POST /services/{id}/deployments`(`triggerType=CLI`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
 
-`logs -f` 는 과거 로그를 먼저 보여 준 뒤 그 마지막 시각부터 SSE 로 이어 받는다. 서버가 5분마다 연결을 끊으므로 마지막 `id` 를 커서로 다시 연결하고, 겹쳐 오는 줄은 한 번만 찍는다. 서버가 `overflow`·`error` 이벤트를 보내면 다시 연결하지 않고 끝낸다. 서버 로그 API 는 CodeBuild 빌드 로그를 제공하지 않아서 `logs` 는 런타임 로그만 다룬다.
+`logs -f` 는 과거 로그를 먼저 보여 준 뒤 그 마지막 시각부터 SSE 로 이어 받는다. 서버가 5분마다 연결을 끊으므로 마지막 `id` 를 커서로 다시 연결하고, 겹쳐 오는 줄은 한 번만 찍는다. 서버가 `overflow`·`error` 이벤트를 보내면 다시 연결하지 않고 끝낸다. `logs` 는 런타임 로그만 다룬다. 빌드 로그는 서버에 별도 API(`.../deployments/{deploymentId}/build-logs`)가 있지만 CLI 는 아직 쓰지 않는다.
 
 ## 개발
 
