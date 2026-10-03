@@ -18,6 +18,10 @@ const MAX_WAIT_MS = 20 * 60_000;
 const MAX_POLL_FAILURES = 5;
 const RETRY_DELAYS_MS = [3000, 4000, 5000, 5000, 5000];
 
+const MAX_SERVERS = 5;
+const NOT_CONFIGURED_MESSAGE =
+  "서버 등록이 아직 준비되지 않았습니다. 잠시 뒤 다시 시도하거나 운영자에게 문의해 주세요.";
+
 const NO_SERVERS_MESSAGE = "등록한 서버가 없습니다. `likelion servers add <이름>` 으로 서버를 등록하세요.";
 
 export interface ServersDeps {
@@ -85,6 +89,12 @@ export async function runServersAdd(
     if (error instanceof ApiError && error.code === "ONPREM_SERVER_NAME_CONFLICT") {
       throw new CliError(`같은 이름의 서버가 이미 있습니다: ${name}. 다른 이름을 쓰거나 \`likelion servers\` 로 확인해 주세요.`);
     }
+    if (error instanceof ApiError && error.code === "ONPREM_SERVER_LIMIT_EXCEEDED") {
+      throw new CliError(
+        `서버는 한 사람당 ${MAX_SERVERS}대까지 등록할 수 있습니다. 쓰지 않는 서버를 \`likelion servers remove <이름>\` 으로 지운 뒤 다시 등록해 주세요.`,
+      );
+    }
+    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw new CliError(NOT_CONFIGURED_MESSAGE);
     if (error instanceof ApiError && error.status === 409) {
       throw new CliError(`서버를 등록할 수 없습니다 (${error.message}). \`likelion servers\` 로 확인해 주세요.`);
     }
@@ -111,7 +121,7 @@ export interface ServersTokenOptions {
   wait?: boolean;
 }
 
-/** 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다. 대기·실패 상태의 서버만 된다. */
+/** 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다. 연결된 서버는 안 되고, 다시 발급하면 상태는 대기로 돌아간다. */
 export async function runServersToken(
   options: ServersTokenOptions,
   deps: ServersDeps = {},
@@ -131,9 +141,10 @@ export async function runServersToken(
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
       throw new CliError(
-        `${server.name} 은 지금 ${serverStatusLabel(server.status)} 상태라 토큰을 다시 발급할 수 없습니다. 대기·실패 상태에서만 다시 발급합니다.`,
+        `${server.name} 은 지금 ${serverStatusLabel(server.status)} 상태라 토큰을 다시 발급할 수 없습니다. 대기·연결 중·실패 상태에서만 다시 발급합니다.`,
       );
     }
+    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw new CliError(NOT_CONFIGURED_MESSAGE);
     throw error;
   }
 

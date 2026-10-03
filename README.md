@@ -51,7 +51,7 @@ $ likelion servers add home-lab
 서버가 연결되었습니다: home-lab (iris-k3x9q2ma.tailb046e8.ts.net)
 ```
 
-- 상태는 대기(`PENDING`) → 연결 중(`REGISTERING`) → 연결됨(`CONNECTED`) / 실패(`FAILED`) 다. 실패하거나 토큰이 만료되면 `servers token` 으로 다시 발급해 서버에서 명령을 다시 실행한다.
+- 상태는 대기(`PENDING`) → 연결 중(`REGISTERING`) → 연결됨(`CONNECTED`) / 실패(`FAILED`) 다. 실패하거나 토큰이 만료되거나 연결 중에 멈추면 `servers token` 으로 다시 발급해(상태는 대기로 돌아간다) 서버에서 명령을 다시 실행한다. 서버는 한 사람당 5대까지 등록한다.
 - 등록 토큰은 설치 명령 안에서 한 번만 보인다. 대화형 터미널이면 3초마다 상태를 확인하며 최대 20분 기다리고, 파이프·CI 에서는 명령만 보여 주고 끝낸다. `--wait`·`--no-wait` 로 바꾼다.
 - 삭제는 서비스가 붙어 있지 않은 서버만 된다. 서버에 설치된 K3s·Tailscale 은 지우지 않는다.
 - 연결된 서버에 배포하려면 `likelion services create --target home-lab` 으로 서비스를 만든다. 연결 전 서버도 고를 수 있지만 경고하고, `up` 은 서버가 연결될 때까지 배포하지 않는다.

@@ -260,6 +260,23 @@ describe("runServersAdd", () => {
     await expect(failure).rejects.not.toThrow("같은 이름");
   });
 
+  it("서버_수_한도를_넘으면_ONPREM_SERVER_LIMIT_EXCEEDED_를_알기_쉽게_알린다", async () => {
+    const t = await setup([errorEnvelope(409, "ONPREM_SERVER_LIMIT_EXCEEDED", "onprem server limit exceeded")]);
+
+    const failure = runServersAdd({ name: "home-lab", wait: true }, t.deps);
+
+    await expect(failure).rejects.toThrow("서버는 한 사람당 5대까지 등록할 수 있습니다.");
+    await expect(failure).rejects.toThrow("likelion servers remove");
+  });
+
+  it("서버_등록이_설정되지_않았으면_503_을_준비_중으로_알린다", async () => {
+    const t = await setup([errorEnvelope(503, "NOT_CONFIGURED", "onprem registration is not configured")]);
+
+    await expect(runServersAdd({ name: "home-lab", wait: true }, t.deps)).rejects.toThrow(
+      "서버 등록이 아직 준비되지 않았습니다.",
+    );
+  });
+
   it("이름이_규칙에_맞지_않으면_422_를_알기_쉽게_알린다", async () => {
     const t = await setup([errorEnvelope(422, "VALIDATION_ERROR", "request validation failed")]);
 
@@ -295,6 +312,27 @@ describe("runServersToken", () => {
     expect(t.pathOf(2)).toBe("/api/v1/onprem-servers/3");
   });
 
+  it("연결_중인_서버도_다시_발급해_대기로_돌아간다", async () => {
+    const t = await setup([serverList(server({ status: "REGISTERING" })), registration()]);
+
+    const result = await runServersToken({ server: "home-lab", wait: false }, t.deps);
+
+    expect(result.status).toBe("PENDING");
+    expect(t.pathOf(1)).toBe("/api/v1/onprem-servers/3/registration-token");
+    expect(t.lines()).toContain(`  ${INSTALL_COMMAND}`);
+  });
+
+  it("서버_등록이_설정되지_않았으면_재발급도_준비_중으로_알린다", async () => {
+    const t = await setup([
+      serverList(server({ status: "FAILED" })),
+      errorEnvelope(503, "NOT_CONFIGURED", "onprem registration is not configured"),
+    ]);
+
+    await expect(runServersToken({ server: "home-lab", wait: false }, t.deps)).rejects.toThrow(
+      "서버 등록이 아직 준비되지 않았습니다.",
+    );
+  });
+
   it("연결된_서버면_409_를_상태와_함께_알린다", async () => {
     const t = await setup([
       serverList(server({ status: "CONNECTED" })),
@@ -302,7 +340,7 @@ describe("runServersToken", () => {
     ]);
 
     await expect(runServersToken({ server: "home-lab", wait: false }, t.deps)).rejects.toThrow(
-      "home-lab 은 지금 연결됨 상태라 토큰을 다시 발급할 수 없습니다.",
+      "home-lab 은 지금 연결됨 상태라 토큰을 다시 발급할 수 없습니다. 대기·연결 중·실패 상태에서만 다시 발급합니다.",
     );
   });
 
