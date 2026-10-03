@@ -57,11 +57,26 @@ export function envelope(data: unknown, init: ResponseInit = {}): Response {
   });
 }
 
-export function errorEnvelope(status: number, code: string, message: string): Response {
+export function errorEnvelope(
+  status: number,
+  code: string,
+  message: string,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify({ success: false, code, message }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
   });
+}
+
+/** 서버가 너무 빠른 폴링에 돌려주는 429. `retryAfter` 가 있으면 `Retry-After` 헤더를 붙인다. */
+export function tooManyRequests(retryAfter?: string): Response {
+  return errorEnvelope(
+    429,
+    "TOO_MANY_REQUESTS",
+    "polling too fast",
+    retryAfter === undefined ? {} : { "Retry-After": retryAfter },
+  );
 }
 
 /** SSE 응답. 프레임 문자열을 순서대로 흘리고 연결을 닫는다. */

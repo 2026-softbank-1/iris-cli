@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { runLogin } from "../src/commands/login.js";
 import { findCredentials } from "../src/lib/config.js";
-import { envelope, errorEnvelope, fakeFetch, useTempConfigDir } from "./helpers.js";
+import { envelope, errorEnvelope, fakeFetch, tooManyRequests, useTempConfigDir } from "./helpers.js";
 
 useTempConfigDir();
 
@@ -92,5 +92,72 @@ describe("runLogin", () => {
     await expect(
       runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps),
     ).rejects.toThrow("로그인 설정이 없습니다");
+  });
+
+  describe("서버가_너무_빠른_폴링이라고_429_로_답하면", () => {
+    // Response 본문은 한 번만 읽을 수 있어서 테스트마다 새로 만든다.
+    const me = () => envelope({ id: 7, githubId: 99, login: "octocat" });
+    const approved = () => envelope({ status: "APPROVED", accessToken: "jwt-1" });
+
+    it("Retry-After_만큼_쉬고_같은_세션으로_다시_묻는다", async () => {
+      const t = deps([envelope(session), tooManyRequests("5"), approved(), me()]);
+
+      const credentials = await runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps);
+
+      expect(credentials.token).toBe("jwt-1");
+      expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 5000]);
+      expect(t.calls[1]?.url).toBe(t.calls[2]?.url);
+      expect(t.calls[2]?.body).toEqual({ pollSecret: "secret-1" });
+    });
+
+    it("Retry-After_가_없으면_interval_만큼_쉰다", async () => {
+      const t = deps([envelope(session), tooManyRequests(), approved(), me()]);
+
+      await runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps);
+
+      expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 2000]);
+    });
+
+    it("Retry-After_가_interval_보다_짧아도_interval_만큼은_쉰다", async () => {
+      const t = deps([envelope(session), tooManyRequests("1"), approved(), me()]);
+
+      await runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps);
+
+      expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 2000]);
+    });
+
+    it("429_뒤에_정상_응답이_오면_다음부터는_interval_로_돌아간다", async () => {
+      const t = deps([
+        envelope(session),
+        tooManyRequests("5"),
+        envelope({ status: "PENDING" }),
+        approved(),
+        me(),
+      ]);
+
+      await runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps);
+
+      expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000, 5000, 2000]);
+    });
+
+    it("기다리면_만료_시각을_넘으면_더_묻지_않고_시간_초과로_끝낸다", async () => {
+      const t = deps([envelope({ ...session, expiresIn: 10 }), tooManyRequests("30")]);
+
+      await expect(
+        runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps),
+      ).rejects.toThrow("시간이 초과");
+
+      expect(t.calls).toHaveLength(2); // 세션 생성 + 429 를 받은 폴링 1번
+      expect(t.sleep.mock.calls.map(([ms]) => ms)).toEqual([2000]);
+      expect(await findCredentials()).toBeNull();
+    });
+
+    it("429_가_아닌_폴링_오류는_그대로_던진다", async () => {
+      const t = deps([envelope(session), errorEnvelope(401, "UNAUTHORIZED", "invalid poll secret")]);
+
+      await expect(
+        runLogin({ apiUrl: "https://api.example.test", browser: false }, t.deps),
+      ).rejects.toThrow("invalid poll secret");
+    });
   });
 });

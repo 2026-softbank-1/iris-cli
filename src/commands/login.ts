@@ -1,7 +1,7 @@
 import open from "open";
 import { ApiClient, type FetchLike } from "../lib/api.js";
 import { type Credentials, saveCredentials } from "../lib/config.js";
-import { CliError } from "../lib/errors.js";
+import { ApiError, CliError } from "../lib/errors.js";
 
 interface CliLoginSession {
   sessionId: string;
@@ -72,13 +72,24 @@ async function waitForApproval(
   clock: { sleep: (ms: number) => Promise<void>; now: () => number },
 ): Promise<string> {
   const deadline = clock.now() + session.expiresIn * 1000;
+  let waitSeconds = session.interval;
   while (clock.now() < deadline) {
-    await clock.sleep(session.interval * 1000);
-    const result = await api.request<CliLoginToken>(
-      "POST",
-      `/auth/cli/sessions/${encodeURIComponent(session.sessionId)}/token`,
-      { body: { pollSecret: session.pollSecret } },
-    );
+    await clock.sleep(waitSeconds * 1000);
+    waitSeconds = session.interval;
+    let result: CliLoginToken;
+    try {
+      result = await api.request<CliLoginToken>(
+        "POST",
+        `/auth/cli/sessions/${encodeURIComponent(session.sessionId)}/token`,
+        { body: { pollSecret: session.pollSecret } },
+      );
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 429) throw error;
+      // 서버가 너무 빠르다고 한다. 알려 준 시간(최소 interval)만큼 쉬고 같은 세션으로 다시 묻는다.
+      waitSeconds = Math.max(error.retryAfterSeconds ?? 0, session.interval);
+      if (clock.now() + waitSeconds * 1000 >= deadline) break; // 기다리면 만료 시각을 넘는다
+      continue;
+    }
     switch (result.status) {
       case "APPROVED":
         if (!result.accessToken) throw new CliError("서버가 토큰 없이 승인 응답을 보냈습니다.");
