@@ -95,7 +95,7 @@ likelion servers token <이름|id> --json                  # 토큰 만료·연�
 likelion services create --repo <url> --target <서버 이름> --project <이름|id> --link
 ```
 
-서버가 연결되기 전이거나 연결이 끊겼으면(`DISCONNECTED`) `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다(`--json` 의 `error.code`). 끊긴 서버는 토큰 재발급이 아니라 서버가 다시 신호를 보내길 기다린다(저절로 `CONNECTED` 로 돌아온다). 등록 토큰은 `installCommand` 안에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다. 내 서버 타깃 배포는 런타임·네트워크 로그를 아직 수집하지 않아 `logs --deploy`·`--network` 가 비어 있다(빌드 로그는 나온다).
+서버가 연결되기 전이거나 연결이 끊겼으면(`DISCONNECTED`) `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다(`--json` 의 `error.code`). 끊긴 서버는 토큰 재발급이 아니라 서버가 다시 신호를 보내길 기다린다(저절로 `CONNECTED` 로 돌아온다). 등록 토큰은 `installCommand` 안에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다. 내 서버 타깃은 런타임 로그(`logs`·`logs --deploy`)가 지금 떠 있는 Pod 의 것만 나오고(재시작·교체·중지된 Pod 의 로그는 없다), 네트워크 로그(`logs --network`)는 지원하지 않아 `NOT_SUPPORTED`(exit 1, 다시 시도해도 같다)로 끝난다. 빌드 로그는 공용 타깃과 같다.
 
 ## 배포가 실패했을 때 (exit 4)
 
