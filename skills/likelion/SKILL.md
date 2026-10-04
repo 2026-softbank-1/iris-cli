@@ -90,11 +90,12 @@ likelion env push .env --yes           # 파일 내용으로 전체 교체! 파�
 
 ```bash
 likelion servers --json                                  # 등록한 서버와 연결 상태 (CONNECTED 여야 배포된다)
-likelion servers add <이름> --no-wait                    # 서버에서 실행할 설치 명령을 출력한다 (사용자가 서버에서 sudo 로 실행). 이름: 1~63자, 영문·숫자·한글·.·_·- (공백·숫자만 불가)
+likelion servers add <이름> --json                       # {server, installCommand} 를 낸다 (기다리지 않는다). installCommand 를 사용자가 서버에서 sudo 로 실행. 이름: 1~63자, 영문·숫자·한글·.·_·- (공백·숫자만 불가)
+likelion servers token <이름|id> --json                  # 토큰 만료·연결 실패 때 새 installCommand 를 받는다
 likelion services create --repo <url> --target <서버 이름> --project <이름|id> --link
 ```
 
-서버가 연결되기 전에는 `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다. 등록 토큰은 설치 명령에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다.
+서버가 연결되기 전에는 `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다(`--json` 의 `error.code`). 등록 토큰은 `installCommand` 안에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다. 내 서버 타깃 배포는 런타임·네트워크 로그를 아직 수집하지 않아 `logs --deploy`·`--network` 가 비어 있다(빌드 로그는 나온다).
 
 ## 배포가 실패했을 때 (exit 4)
 
@@ -123,4 +124,4 @@ likelion services create --repo <url> --target <서버 이름> --project <이름
 | `diagnose [id] [--refresh --evidence]` · `fix [id] --yes` | AI 진단·수정 |
 | `setup agent [--print --global --dir --force]` | 이 스킬 파일을 설치하거나 내용을 출력 |
 
-`--json` 은 `login`·`logout`·`servers add|token|remove`·`env pull` 을 뺀 명령이 지원한다. 자세한 옵션은 `likelion <명령> --help`.
+`--json` 은 `login`·`logout`·`env pull` 을 뺀 명령이 지원한다. 자세한 옵션은 `likelion <명령> --help`.
