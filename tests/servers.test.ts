@@ -84,6 +84,28 @@ describe("runServersList", () => {
     ]);
   });
 
+  it("연결이_끊긴_서버는_마지막_신호_시각과_함께_연결_끊김으로_보여_준다", async () => {
+    const t = await setup([
+      serverList(
+        server({ status: "DISCONNECTED", lastSeenAt: "2026-10-04T04:10:00Z", connectedAt: "2026-10-04T03:10:00Z" }),
+        server({ id: 4, name: "lab2", serverKey: "p7m2x8qa", status: "DISCONNECTED" }),
+      ),
+    ]);
+
+    await runServersList({}, t.deps);
+
+    expect(t.lines()[1]).toContain("연결 끊김 (마지막 신호 2026-10-04T04:10:00Z)");
+    expect(t.lines()[2]).toMatch(/^lab2 +연결 끊김 +p7m2x8qa/);
+  });
+
+  it("json_은_lastSeenAt_도_그대로_낸다", async () => {
+    const t = await setup([serverList(server({ status: "DISCONNECTED", lastSeenAt: "2026-10-04T04:10:00Z" }))]);
+
+    await runServersList({ json: true }, t.deps);
+
+    expect(JSON.parse(t.lines()[0] ?? "")[0]).toMatchObject({ status: "DISCONNECTED", lastSeenAt: "2026-10-04T04:10:00Z" });
+  });
+
   it("서버가_없으면_servers_add_를_안내한다", async () => {
     const t = await setup([envelope([])]);
 
@@ -387,6 +409,20 @@ describe("runServersToken", () => {
     await expect(runServersToken({ server: "home-lab", wait: false }, t.deps)).rejects.toThrow(
       "home-lab 은 지금 연결됨 상태라 토큰을 다시 발급할 수 없습니다. 대기·연결 중·실패 상태에서만 다시 발급합니다.",
     );
+  });
+
+  it("연결이_끊긴_서버의_재발급이_거절되면_재발급_대신_신호가_돌아오길_안내한다", async () => {
+    const t = await setup([
+      serverList(server({ status: "DISCONNECTED", lastSeenAt: "2026-10-04T04:10:00Z" })),
+      errorEnvelope(409, "INVALID_STATUS_TRANSITION", "invalid status transition"),
+    ]);
+
+    const failure = runServersToken({ server: "home-lab", wait: false }, t.deps);
+
+    await expect(failure).rejects.toThrow("home-lab 은 연결이 끊긴 상태라 토큰을 다시 발급할 수 없습니다.");
+    await expect(failure).rejects.toThrow("서버가 신호를 다시 보내면 저절로 연결됩니다.");
+    await expect(failure).rejects.not.toThrow("대기·연결 중·실패 상태에서만");
+    await expect(failure).rejects.toMatchObject({ code: "INVALID_STATUS_TRANSITION", status: 409 });
   });
 
   it("없는_서버면_가능한_값을_알린다", async () => {

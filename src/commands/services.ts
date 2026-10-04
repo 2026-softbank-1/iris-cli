@@ -184,8 +184,12 @@ function describeChoice(choice: TargetChoice): string {
 function warnIfNotConnected(choice: TargetChoice, warn: (message: string) => void): void {
   const status = choice.target.connectionStatus;
   if (status == null || status === "CONNECTED") return;
+  const state =
+    status === "DISCONNECTED"
+      ? `서버 ${choice.name} 의 연결이 끊겨 있습니다`
+      : `서버 ${choice.name} 은 아직 연결되지 않았습니다 (${serverStatusLabel(status)})`;
   warn(
-    `서버 ${choice.name} 은 아직 연결되지 않았습니다 (${serverStatusLabel(status)}). 서비스는 만들지만 연결되기 전에는 배포할 수 없습니다. \`likelion servers\` 로 상태를 확인하세요.`,
+    `${state}. 서비스는 만들지만 연결되기 전에는 배포할 수 없습니다. \`likelion servers\` 로 상태를 확인하세요.`,
   );
 }
 

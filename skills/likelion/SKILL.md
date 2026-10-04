@@ -89,13 +89,13 @@ likelion env push .env --yes           # 파일 내용으로 전체 교체! 파�
 **내 서버(온프레미스)에 배포** — 사용자가 자기 서버를 등록해 배포 대상으로 쓴다.
 
 ```bash
-likelion servers --json                                  # 등록한 서버와 연결 상태 (CONNECTED 여야 배포된다)
+likelion servers --json                                  # 등록한 서버와 연결 상태 (CONNECTED 여야 배포된다. 연결됐던 서버의 신호가 끊기면 DISCONNECTED + lastSeenAt)
 likelion servers add <이름> --json                       # {server, installCommand} 를 낸다 (기다리지 않는다). installCommand 를 사용자가 서버에서 sudo 로 실행. 이름: 1~63자, 영문·숫자·한글·.·_·- (공백·숫자만 불가)
 likelion servers token <이름|id> --json                  # 토큰 만료·연결 실패 때 새 installCommand 를 받는다
 likelion services create --repo <url> --target <서버 이름> --project <이름|id> --link
 ```
 
-서버가 연결되기 전에는 `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다(`--json` 의 `error.code`). 등록 토큰은 `installCommand` 안에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다. 내 서버 타깃 배포는 런타임·네트워크 로그를 아직 수집하지 않아 `logs --deploy`·`--network` 가 비어 있다(빌드 로그는 나온다).
+서버가 연결되기 전이거나 연결이 끊겼으면(`DISCONNECTED`) `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다(`--json` 의 `error.code`). 끊긴 서버는 토큰 재발급이 아니라 서버가 다시 신호를 보내길 기다린다(저절로 `CONNECTED` 로 돌아온다). 등록 토큰은 `installCommand` 안에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다. 내 서버 타깃 배포는 런타임·네트워크 로그를 아직 수집하지 않아 `logs --deploy`·`--network` 가 비어 있다(빌드 로그는 나온다).
 
 ## 배포가 실패했을 때 (exit 4)
 

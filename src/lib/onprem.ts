@@ -5,6 +5,7 @@ const STATUS_LABELS: Record<OnpremServerStatus, string> = {
   PENDING: "대기",
   REGISTERING: "연결 중",
   CONNECTED: "연결됨",
+  DISCONNECTED: "연결 끊김",
   FAILED: "실패",
 };
 
@@ -12,6 +13,10 @@ const STATUS_LABELS: Record<OnpremServerStatus, string> = {
 export function serverStatusLabel(status: string): string {
   return STATUS_LABELS[status as OnpremServerStatus] ?? status;
 }
+
+/** 끊긴 서버가 다시 연결되는 방법. 토큰 재발급이 아니라 서버의 신호가 돌아오는 것이다. */
+export const DISCONNECTED_HINT =
+  "서버가 신호를 다시 보내면 저절로 연결됩니다. 서버가 켜져 있고 네트워크가 되는지 확인하세요.";
 
 /** 서버 등록·토큰 재발급 뒤 설치 명령과 안내를 찍는다. 토큰은 설치 명령 안에서만 보여 준다. */
 export function printInstallCommand(

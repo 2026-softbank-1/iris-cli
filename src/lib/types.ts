@@ -119,7 +119,11 @@ export interface Target {
   connectionStatus?: OnpremServerStatus | null;
 }
 
-export type OnpremServerStatus = "PENDING" | "REGISTERING" | "CONNECTED" | "FAILED";
+/**
+ * `DISCONNECTED` 는 연결됐던 서버의 신호(하트비트)가 한동안 끊긴 상태다. 신호가 다시 오면 저절로
+ * `CONNECTED` 로 돌아온다. 서버(iris-was)가 계산해서 주는 값이다.
+ */
+export type OnpremServerStatus = "PENDING" | "REGISTERING" | "CONNECTED" | "DISCONNECTED" | "FAILED";
 
 export interface OnpremServer {
   id: number;
@@ -131,6 +135,8 @@ export interface OnpremServer {
   failureCode?: string | null;
   registrationExpiresAt?: string | null;
   connectedAt?: string | null;
+  /** 서버가 마지막으로 신호를 보낸 시각(1분마다). 한 번도 연결되지 않았으면 없다 */
+  lastSeenAt?: string | null;
   createdAt: string;
 }
 

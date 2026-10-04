@@ -126,6 +126,26 @@ describe("runServicesCreate", () => {
     );
   });
 
+  it("연결이_끊긴_서버는_아직_연결되지_않은_것과_다르게_경고한다", async () => {
+    const dropped = () =>
+      envelope([
+        { id: 1, name: "aws", kind: "AWS" },
+        { id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, connectionStatus: "DISCONNECTED" },
+      ]);
+    const droppedServers = () =>
+      envelope([
+        { id: 3, name: "home-lab", serverKey: "k3x9q2ma", status: "DISCONNECTED", targetId: 7, createdAt: "2026-10-04T00:00:00Z" },
+      ]);
+    const t = await setup([projects(), dropped(), droppedServers(), created()]);
+
+    await runServicesCreate({ project: "demo", repo: REPO, target: "home-lab", link: false }, t.deps);
+
+    expect(t.warn).toHaveBeenCalledWith(
+      expect.stringContaining("서버 home-lab 의 연결이 끊겨 있습니다. 서비스는 만들지만 연결되기 전에는 배포할 수 없습니다."),
+    );
+    expect(t.warn).not.toHaveBeenCalledWith(expect.stringContaining("아직 연결되지 않았습니다"));
+  });
+
   it("타깃_이름이나_id_로도_고른다", async () => {
     const t = await setup([projects(), targets(), servers(), created()]);
 
