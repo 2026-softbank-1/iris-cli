@@ -1,6 +1,6 @@
 {
   "name": "likelion",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Likelion CLI",
   "private": true,
   "type": "module",
