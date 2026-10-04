@@ -62,8 +62,9 @@ export function errorEnvelope(
   code: string,
   message: string,
   headers: Record<string, string> = {},
+  details?: { field: string; reason: string }[],
 ): Response {
-  return new Response(JSON.stringify({ success: false, code, message }), {
+  return new Response(JSON.stringify({ success: false, code, message, details }), {
     status,
     headers: { "Content-Type": "application/json", ...headers },
   });

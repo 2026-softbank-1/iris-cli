@@ -11,12 +11,19 @@ import { runWhoami } from "./commands/whoami.js";
 import { DEFAULT_API_URL, resolveApiUrl } from "./lib/config.js";
 import { createAsk } from "./lib/prompt.js";
 
-export function buildProgram(): Command {
+export interface ProgramOptions {
+  /** 옵션 파싱 오류를 commander 가 stderr 에 쓰지 않게 한다. `--json` 은 JSON 오류 한 줄만 내기 위해 쓴다 */
+  quietParseErrors?: boolean;
+}
+
+export function buildProgram(options: ProgramOptions = {}): Command {
+  // exitOverride: commander 가 직접 process.exit 하지 않고 던지게 해 `src/index.ts` 가 종료 코드(사용법 오류 = 2)를 정한다.
   const program = new Command()
     .name("likelion")
     .description("Likelion CLI")
-    .version(pkg.version, "-v, --version");
-
+    .version(pkg.version, "-v, --version")
+    .exitOverride();
+  if (options.quietParseErrors) program.configureOutput({ writeErr: () => {} });
   program
     .command("login")
     .description("GitHub 계정으로 로그인한다")
@@ -29,8 +36,9 @@ export function buildProgram(): Command {
   program
     .command("whoami")
     .description("로그인한 GitHub 계정을 보여 준다")
-    .action(async () => {
-      await runWhoami();
+    .option("--json", "JSON 으로 낸다", false)
+    .action(async (options: { json: boolean }) => {
+      await runWhoami(options);
     });
 
   program

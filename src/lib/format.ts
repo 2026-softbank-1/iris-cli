@@ -1,11 +1,11 @@
-import { CliError } from "./errors.js";
+import { UsageError } from "./errors.js";
 
 const DURATION_UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
 
 /** `30m`·`1h`·`2d` 같은 기간을 밀리초로 바꾼다. */
 export function parseDuration(text: string): number {
   const match = /^(\d+)([smhd])$/.exec(text.trim());
-  if (!match) throw new CliError(`기간 형식이 올바르지 않습니다: ${text} (예: 30m, 1h, 2d)`);
+  if (!match) throw new UsageError(`기간 형식이 올바르지 않습니다: ${text} (예: 30m, 1h, 2d)`);
   const unit = match[2] as keyof typeof DURATION_UNIT_MS;
   return Number(match[1]) * DURATION_UNIT_MS[unit];
 }

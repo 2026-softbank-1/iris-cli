@@ -38,7 +38,7 @@ flowchart LR
 | 명령 | 설명 | 상태 |
 |---|---|---|
 | `likelion login` | 브라우저에서 GitHub 로그인을 승인하면 토큰을 받아 저장한다 | 구현됨 ([계약](docs/login-contract.md), 운영 서버에서 확인) |
-| `likelion whoami` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
+| `likelion whoami [--json]` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
 | `likelion logout` | 저장된 로그인 정보를 지운다 | 구현됨 |
 | `likelion link [--project <id\|name>] [--service <id\|name>]` | 프로젝트·서비스를 골라 현재 폴더에 연결한다 | 구현됨 |
 | `likelion status` | 연결된 서비스의 최근 배포 상태·단계별 소요 시간·주소를 보여 준다 | 구현됨 |
@@ -81,6 +81,8 @@ flowchart LR
 
 - API 주소: `login --api-url <url>` > 환경변수 `LIKELION_API_URL` > 기본값 `https://api.likelion.uk`. 로그인한 뒤에는 저장된 주소를 쓴다.
 - 로그인 정보: `~/.config/likelion/credentials.json` (권한 `0600`). `XDG_CONFIG_HOME` 으로 위치를 바꾸고, 테스트에서는 `LIKELION_CONFIG_DIR` 로 덮어쓴다. 토큰은 로그·출력에 남기지 않는다.
+- `LIKELION_TOKEN`: 저장된 로그인 대신 쓸 토큰(CI·에이전트). 서버 주소는 `LIKELION_API_URL` 이나 기본값이다.
+- `LIKELION_NON_INTERACTIVE=1`: 터미널에서도 질문하지 않는다. `CI`·`CLAUDECODE`·`AI_AGENT`·`AGENT` 가 설정돼 있어도 같다. 확인이 필요한 명령은 `--yes` 를 요구한다.
 
 ## 개발
 
