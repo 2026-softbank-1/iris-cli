@@ -6,6 +6,7 @@ import {
 } from "../src/commands/deploymentLogs.js";
 import {
   envelope,
+  errorEnvelope,
   fakeFetch,
   linkTo,
   loginAs,
@@ -265,24 +266,25 @@ describe("runDeploymentLogs --deploy · --network", () => {
     const HOME_LAB = { id: 2, name: "home-lab", kind: "ONPREM" };
     const empty = () => envelope({ entries: [], isTruncated: false });
 
-    it("서버_타깃에_배포된_배포의_런타임_로그가_비면_서버_로그는_수집하지_않는다고_알린다", async () => {
+    it("서버_타깃에_배포된_배포의_런타임_로그가_비면_지금_떠_있는_Pod_의_로그만_보인다고_알린다", async () => {
       const t = await setup([empty(), deploymentOn(HOME_LAB)]);
 
       await t.run({ kind: "deploy" });
 
       expect(new URL(t.calls[1]?.url ?? "").pathname).toBe("/api/v1/services/3/deployments/12");
       expect(t.warn).toHaveBeenCalledWith(
-        "이 배포는 내 서버(온프레미스) 타깃에 배포돼 런타임 로그를 아직 수집하지 않습니다.",
+        "내 서버(온프레미스) 타깃은 지금 떠 있는 Pod 의 로그만 보여 줍니다. 이 배포의 Pod 가 재시작·교체·중지돼 지금 없으면 로그도 비어 있습니다.",
       );
       expect(t.warn).not.toHaveBeenCalledWith(expect.stringContaining("성공하지 못한 배포"));
+      expect(t.warn).not.toHaveBeenCalledWith(expect.stringContaining("수집하지 않습니다"));
     });
 
-    it("서버_타깃_배포의_네트워크_로그가_비면_ALB_로그가_없다고_알린다", async () => {
+    it("서버_타깃_배포의_네트워크_로그가_200_으로_비면_ALB_로그가_없다고_알린다", async () => {
       const t = await setup([empty(), deploymentOn(HOME_LAB)]);
 
       await t.run({ kind: "network" });
 
-      expect(t.warn).toHaveBeenCalledWith("이 배포는 내 서버(온프레미스) 타깃에 배포돼 네트워크(ALB) 로그가 없습니다.");
+      expect(t.warn).toHaveBeenCalledWith("내 서버(온프레미스) 타깃은 네트워크(ALB) 로그가 없습니다.");
     });
 
     it("공용_타깃_배포는_기존_안내를_그대로_낸다", async () => {
@@ -315,6 +317,67 @@ describe("runDeploymentLogs --deploy · --network", () => {
       await t.run({ kind: "deploy" });
 
       expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("런타임 로그가 없습니다"));
+    });
+
+    describe("서버가_NOT_CONFIGURED_503_을_줄_때", () => {
+      const notConfigured = () => errorEnvelope(503, "NOT_CONFIGURED", "observability is not configured");
+
+      it("서버_타깃의_network_는_지원하지_않는다는_재시도_불가_오류다", async () => {
+        const t = await setup([notConfigured(), deploymentOn(HOME_LAB)]);
+
+        const failure = t.run({ kind: "network" });
+
+        await expect(failure).rejects.toMatchObject({ code: "NOT_SUPPORTED", exitCode: 1 });
+        await expect(failure).rejects.toThrow("내 서버(온프레미스) 타깃은 네트워크 로그를 지원하지 않습니다.");
+        await expect(failure).rejects.toThrow("likelion logs --deploy");
+        expect(new URL(t.calls[1]?.url ?? "").pathname).toBe("/api/v1/services/3/deployments/12");
+      });
+
+      it("서버_타깃의_deploy_는_서버_설정이_없다고_알리되_상태와_코드를_지킨다", async () => {
+        const t = await setup([notConfigured(), deploymentOn(HOME_LAB)]);
+
+        const failure = t.run({ kind: "deploy" });
+
+        await expect(failure).rejects.toThrow("런타임 로그를 읽는 설정이 서버에 아직 없습니다");
+        await expect(failure).rejects.toMatchObject({ code: "NOT_CONFIGURED", status: 503, exitCode: 5 });
+      });
+
+      it("공용_타깃_배포의_503_은_고치지_않고_그대로_낸다", async () => {
+        const t = await setup([notConfigured(), deploymentOn(AWS)]);
+
+        const failure = t.run({ kind: "network" });
+
+        await expect(failure).rejects.toMatchObject({ code: "NOT_CONFIGURED", status: 503, exitCode: 5 });
+        await expect(failure).rejects.not.toThrow("지원하지 않습니다");
+      });
+
+      it("공용_타깃이_섞여_있고_타깃을_고르지_않았으면_서버_탓으로_돌리지_않는다", async () => {
+        const t = await setup([notConfigured(), deploymentOn(AWS, HOME_LAB)]);
+
+        await expect(t.run({ kind: "network" })).rejects.toMatchObject({ code: "NOT_CONFIGURED", exitCode: 5 });
+      });
+
+      it("섞여_있어도_서버_타깃을_골랐으면_그_타깃만_보고_지원하지_않는다고_알린다", async () => {
+        const t = await setup([service(), targetList(), notConfigured(), deploymentOn(AWS, HOME_LAB)]);
+
+        await expect(t.run({ kind: "network", target: "home-lab" })).rejects.toMatchObject({
+          code: "NOT_SUPPORTED",
+          exitCode: 1,
+        });
+      });
+
+      it("배포_상세를_못_읽으면_원래_오류를_그대로_낸다", async () => {
+        const t = await setup([notConfigured(), new Response("Not Found", { status: 404 })]);
+
+        await expect(t.run({ kind: "network" })).rejects.toMatchObject({ code: "NOT_CONFIGURED", status: 503, exitCode: 5 });
+      });
+
+      it("다른_서버_오류는_배포_상세를_조회하지_않고_그대로_낸다", async () => {
+        const t = await setup([errorEnvelope(502, "EXTERNAL_ERROR", "argocd failed")]);
+
+        await expect(t.run({ kind: "deploy" })).rejects.toMatchObject({ code: "EXTERNAL_ERROR", status: 502 });
+        expect(t.calls).toHaveLength(1);
+      });
     });
 
     it("로그가_있으면_배포_상세를_조회하지_않는다", async () => {

@@ -1,7 +1,7 @@
 import type { ApiClient, FetchLike } from "../lib/api.js";
 import { BuildLogReader, formatBuildLogLine, MAX_BUILD_LOG_LINES } from "../lib/buildLogs.js";
 import { resolveDeploymentId, TERMINAL_STATUSES } from "../lib/deployment.js";
-import { UsageError } from "../lib/errors.js";
+import { ApiError, CliError, EXIT, explainApiError, UsageError } from "../lib/errors.js";
 import { formatBytes, formatSeconds, formatTimestampNs } from "../lib/format.js";
 import { requireLinkedSession } from "../lib/session.js";
 import type {
@@ -77,17 +77,29 @@ export async function runDeploymentLogs(
       return;
     case "deploy": {
       const targetId = await optionalTargetId(api, token, link.serviceId, options.target);
-      const page = await api.request<DeployLogsPage>("GET", `${base}/deploy-logs`, {
-        token,
-        query: { targetId, limit: options.limit, search: options.search },
-      });
+      let page: DeployLogsPage;
+      try {
+        page = await api.request<DeployLogsPage>("GET", `${base}/deploy-logs`, {
+          token,
+          query: { targetId, limit: options.limit, search: options.search },
+        });
+      } catch (error) {
+        // 내 서버 타깃의 런타임 로그는 서버가 Argo CD 로 읽는다. 그 설정이 없으면 503 이다.
+        if (error instanceof ApiError && error.code === "NOT_CONFIGURED" && isOnpremOnly(await deploymentTargets(api, token, base, targetId))) {
+          throw explainApiError(
+            error,
+            "내 서버(온프레미스) 타깃의 런타임 로그를 읽는 설정이 서버에 아직 없습니다. 운영자에게 문의해 주세요.",
+          );
+        }
+        throw error;
+      }
       for (const entry of page.entries) {
         emit(`${formatTimestampNs(entry.timestampNs)} ${entry.message}`, entry);
       }
       if (page.entries.length === 0) {
         warn(
-          (await isOnpremDeployment(api, token, base, targetId))
-            ? "이 배포는 내 서버(온프레미스) 타깃에 배포돼 런타임 로그를 아직 수집하지 않습니다."
+          hasOnprem(await deploymentTargets(api, token, base, targetId))
+            ? "내 서버(온프레미스) 타깃은 지금 떠 있는 Pod 의 로그만 보여 줍니다. 이 배포의 Pod 가 재시작·교체·중지돼 지금 없으면 로그도 비어 있습니다."
             : "이 배포의 런타임 로그가 없습니다. 성공하지 못한 배포이거나 로그가 아직 수집되지 않았습니다.",
         );
       }
@@ -96,15 +108,29 @@ export async function runDeploymentLogs(
     }
     case "network": {
       const targetId = await optionalTargetId(api, token, link.serviceId, options.target);
-      const page = await api.request<NetworkLogsPage>("GET", `${base}/network-logs`, {
-        token,
-        query: { targetId, limit: options.limit, statusClass: options.statusClass },
-      });
+      let page: NetworkLogsPage;
+      try {
+        page = await api.request<NetworkLogsPage>("GET", `${base}/network-logs`, {
+          token,
+          query: { targetId, limit: options.limit, statusClass: options.statusClass },
+        });
+      } catch (error) {
+        // 내 서버 타깃은 네트워크(ALB) 로그를 수집하지 않아 서버가 항상 503 NOT_CONFIGURED 를 준다.
+        // 기다려도 나아지지 않으니 다시 시도하라는 오류(5)가 아니라 지원하지 않는다는 오류(1)로 알린다.
+        if (error instanceof ApiError && error.code === "NOT_CONFIGURED" && isOnpremOnly(await deploymentTargets(api, token, base, targetId))) {
+          throw new CliError(
+            "내 서버(온프레미스) 타깃은 네트워크 로그를 지원하지 않습니다. 런타임 로그는 `likelion logs --deploy` 로 볼 수 있습니다.",
+            EXIT.FAILURE,
+            "NOT_SUPPORTED",
+          );
+        }
+        throw error;
+      }
       for (const entry of page.entries) emit(formatNetworkEntry(entry), entry);
       if (page.entries.length === 0) {
         warn(
-          (await isOnpremDeployment(api, token, base, targetId))
-            ? "이 배포는 내 서버(온프레미스) 타깃에 배포돼 네트워크(ALB) 로그가 없습니다."
+          hasOnprem(await deploymentTargets(api, token, base, targetId))
+            ? "내 서버(온프레미스) 타깃은 네트워크(ALB) 로그가 없습니다."
             : "이 배포의 네트워크 로그가 없습니다. 성공하지 못한 배포이거나, ALB 가 로그를 올리는 데 몇 분 걸려 아직 없을 수 있습니다.",
         );
       }
@@ -114,24 +140,31 @@ export async function runDeploymentLogs(
   }
 }
 
+type DeployTarget = { id: number; name: string; kind?: string };
+
 /**
- * 이 배포가 내 서버(온프레미스) 타깃에 배포됐는지. 로그가 비었을 때 이유를 가르는 데만 쓰므로
- * 조회에 실패하면 모른다고 보고(false) 일반 안내를 한다. `targetId` 를 골랐으면 그 타깃만 본다.
+ * 이 배포가 올라간 타깃. `targetId` 를 골랐으면 그 타깃만 본다. 로그가 비었거나 서버가 거절했을 때
+ * 이유를 가르는 데만 쓰므로 조회에 실패하면 빈 목록(모른다)을 돌려 일반 안내로 물러난다.
  */
-async function isOnpremDeployment(
+async function deploymentTargets(
   api: ApiClient,
   token: string,
   deploymentPath: string,
   targetId: number | undefined,
-): Promise<boolean> {
+): Promise<DeployTarget[]> {
   try {
     const detail = await api.request<DeploymentDetail>("GET", deploymentPath, { token });
     const targets = detail.configuration?.deploy?.targets ?? [];
-    return targets.some((target) => target.kind === "ONPREM" && (targetId === undefined || target.id === targetId));
+    return targetId === undefined ? targets : targets.filter((target) => target.id === targetId);
   } catch {
-    return false;
+    return [];
   }
 }
+
+const isOnprem = (target: DeployTarget): boolean => target.kind === "ONPREM";
+const hasOnprem = (targets: DeployTarget[]): boolean => targets.some(isOnprem);
+/** 서버의 오류를 내 서버 탓으로 돌리려면 공용 타깃이 섞여 있지 않아야 한다. */
+const isOnpremOnly = (targets: DeployTarget[]): boolean => targets.length > 0 && targets.every(isOnprem);
 
 function validate(options: DeploymentLogsOptions): void {
   if (options.follow && options.kind !== "build") {

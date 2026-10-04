@@ -52,7 +52,7 @@ HTTP 상태와의 대응은 401 → 3, 429·5xx → 5, 나머지 4xx → 1 이�
 
 | 필드 | 설명 |
 |---|---|
-| `code` | 서버가 준 코드(`VARIABLE_CONFLICT`·`DEPLOYMENT_IN_PROGRESS`·`CONFIGURATION_VALUES_REQUIRED` 등)나 CLI 의 코드: `USAGE`·`UNAUTHENTICATED`·`CONNECTION_FAILED`·`DEPLOYMENT_FAILED`·`DEPLOYMENT_ROLLED_BACK`·`DEPLOYMENT_MANUAL_INTERVENTION`·`DEPLOYMENT_SUPERSEDED`·`TARGET_NOT_CONNECTED`(배포 타깃 서버가 아직 연결되지 않음)·진단·수정 실패 코드. 코드가 없는 일반 오류는 종료 코드별 기본값(`ERROR`·`FAILED`·`UNAVAILABLE`) |
+| `code` | 서버가 준 코드(`VARIABLE_CONFLICT`·`DEPLOYMENT_IN_PROGRESS`·`CONFIGURATION_VALUES_REQUIRED` 등)나 CLI 의 코드: `USAGE`·`UNAUTHENTICATED`·`CONNECTION_FAILED`·`DEPLOYMENT_FAILED`·`DEPLOYMENT_ROLLED_BACK`·`DEPLOYMENT_MANUAL_INTERVENTION`·`DEPLOYMENT_SUPERSEDED`·`TARGET_NOT_CONNECTED`(배포 타깃 서버가 아직 연결되지 않음)·`NOT_SUPPORTED`(그 타깃에서는 지원하지 않는 기능, 다시 시도해도 같다)·진단·수정 실패 코드. 코드가 없는 일반 오류는 종료 코드별 기본값(`ERROR`·`FAILED`·`UNAVAILABLE`) |
 | `message` | 사람이 읽을 안내(다음에 할 명령 포함) |
 | `exitCode` | 종료 코드 |
 | `retryable` | 종료 코드가 5 이면 `true` |
