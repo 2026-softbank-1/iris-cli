@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatSeconds, formatTimestampNs, parseDuration, shortSha } from "../src/lib/format.js";
+import {
+  formatSeconds,
+  formatTable,
+  formatTimestampNs,
+  parseDuration,
+  shortSha,
+} from "../src/lib/format.js";
 
 describe("parseDuration", () => {
   it("단위별로_밀리초로_바꾼다", () => {
@@ -44,5 +50,17 @@ describe("shortSha", () => {
 
   it("값이_없으면_빈_문자열_그대로", () => {
     expect(shortSha("")).toBe("");
+  });
+});
+
+describe("formatTable", () => {
+  it("한글을_두_칸으로_세어_열을_맞추고_마지막_열은_채우지_않는다", () => {
+    expect(
+      formatTable([
+        ["이름", "상태", "키"],
+        ["home-lab", "연결 중", "k3x9q2ma"],
+        ["a", "대기", "-"],
+      ]),
+    ).toEqual(["이름      상태     키", "home-lab  연결 중  k3x9q2ma", "a         대기     -"]);
   });
 });

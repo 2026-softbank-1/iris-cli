@@ -1,6 +1,6 @@
 {
   "name": "likelion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Likelion CLI",
   "private": true,
   "type": "module",
@@ -8,7 +8,8 @@
     "likelion": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "engines": {
     "node": ">=20"

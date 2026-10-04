@@ -71,5 +71,5 @@ Build Worker 는 `CLI` 요청의 소스를 GitHub 가 아니라 이 업로드에
 
 - 아카이브에서 `.git`·`node_modules`·`.likelion` 은 항상 뺀다. 폴더의 `.gitignore` 와 `.likelionignore` 도 따른다.
 - 한도를 넘는 아카이브는 올리기 전에 알려 주고, 서버의 `413` 도 같은 메시지로 안내한다.
-- 배포가 끝날 때까지 `GET /services/{id}/deployments/{deploymentId}` 를 폴링해 상태 전이를 출력한다. 서버에는 빌드 로그 API(`GET /services/{id}/deployments/{deploymentId}/build-logs`)가 있지만 `up` 은 아직 쓰지 않고 상태만 보여 준다.
+- 배포가 끝날 때까지 `GET /services/{id}/deployments/{deploymentId}` 를 폴링해 상태 전이를 출력한다. 기본은 상태만 보여 주고, `--logs` 를 주면 서버의 빌드 로그 API(`GET /services/{id}/deployments/{deploymentId}/build-logs`)를 같이 읽어 보여 준다.
 - 폴링 중 5xx 와 연결 오류는 연속 5회까지 2~5초씩 늘려 가며 다시 확인한다(성공하면 횟수를 0 으로 되돌린다). 넘으면 배포 번호와 `likelion status` 확인 안내를 담아 끝낸다. 4xx 는 다시 시도하지 않고 바로 끝낸다.

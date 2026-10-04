@@ -14,7 +14,7 @@ const credentials = {
 
 describe("runWhoami", () => {
   it("로그인_정보가_없으면_login_안내", async () => {
-    await expect(runWhoami({ log: vi.fn() })).rejects.toThrow("likelion login");
+    await expect(runWhoami({}, { log: vi.fn() })).rejects.toThrow("likelion login");
   });
 
   it("저장된_토큰으로_GitHub_계정을_출력한다", async () => {
@@ -22,7 +22,7 @@ describe("runWhoami", () => {
     const { fetchImpl, calls } = fakeFetch([envelope({ id: 7, githubId: 99, login: "octocat" })]);
     const log = vi.fn();
 
-    await runWhoami({ fetchImpl, log });
+    await runWhoami({}, { fetchImpl, log });
 
     expect(log).toHaveBeenCalledWith("octocat");
     expect(calls[0]).toMatchObject({ method: "GET", url: "https://api.example.test/api/v1/me" });
@@ -33,7 +33,7 @@ describe("runWhoami", () => {
     await saveCredentials(credentials);
     const { fetchImpl } = fakeFetch([errorEnvelope(401, "UNAUTHORIZED", "로그인이 필요합니다")]);
 
-    await expect(runWhoami({ fetchImpl, log: vi.fn() })).rejects.toThrow("만료");
+    await expect(runWhoami({}, { fetchImpl, log: vi.fn() })).rejects.toThrow("만료");
   });
 });
 

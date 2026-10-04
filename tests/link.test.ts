@@ -121,4 +121,27 @@ describe("findLink · requireLink", () => {
 
     await expect(requireLink(cwd(), credentials)).rejects.toThrow("https://other.example.test");
   });
+
+  it("json_이면_진행_안내는_stderr_로_보내고_stdout_에는_연결_정보_JSON_만_낸다", async () => {
+    await loginAs();
+    const { fetchImpl } = fakeFetch([projects(), services()]);
+    const log = vi.fn();
+    const warn = vi.fn();
+
+    await runLink({ project: "demo", service: "web", json: true }, { fetchImpl, cwd: cwd(), log, warn });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(log.mock.calls[0]?.[0] as string)).toMatchObject({ projectName: "demo", serviceId: 3 });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("에 연결했습니다"));
+  });
+
+  it("비대화형에서_고를_수_없으면_사용법_오류로_옵션을_안내한다", async () => {
+    await loginAs();
+    const { fetchImpl } = fakeFetch([projects()]);
+
+    await expect(runLink({}, { fetchImpl, cwd: cwd(), log: vi.fn() })).rejects.toMatchObject({
+      exitCode: 2,
+      code: "USAGE",
+    });
+  });
 });

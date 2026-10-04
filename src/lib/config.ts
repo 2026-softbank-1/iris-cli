@@ -7,7 +7,8 @@ export const DEFAULT_API_URL = "https://api.likelion.uk";
 export interface Credentials {
   apiUrl: string;
   token: string;
-  user: { id: number; login: string };
+  /** `login` 으로 저장한 로그인 정보에만 있다. `LIKELION_TOKEN` 으로 쓸 때는 알 수 없다 */
+  user?: { id: number; login: string };
 }
 
 function configDir(): string {
@@ -27,6 +28,21 @@ export async function findCredentials(): Promise<Credentials | null> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
+}
+
+/** 환경변수 `LIKELION_TOKEN`. 있으면 저장된 로그인보다 먼저 쓴다(CI·에이전트용). */
+export function envToken(): string | undefined {
+  return process.env.LIKELION_TOKEN?.trim() || undefined;
+}
+
+/**
+ * 지금 쓸 인증 정보. `LIKELION_TOKEN` 이 있으면 그 토큰을(서버 주소는 `LIKELION_API_URL` 이나 기본값),
+ * 없으면 `login` 으로 저장한 정보를 쓴다.
+ */
+export async function findActiveCredentials(): Promise<Credentials | null> {
+  const token = envToken();
+  if (token) return { apiUrl: resolveApiUrl(undefined), token };
+  return findCredentials();
 }
 
 export async function saveCredentials(credentials: Credentials): Promise<void> {
