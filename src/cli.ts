@@ -289,7 +289,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
   servers
     .command("add")
     .description("서버를 등록하고 서버에서 실행할 설치 명령을 보여 준다")
-    .argument("<name>", "서버 이름 (1~63자)")
+    .argument("<name>", "서버 이름 (1~63자, 영문·숫자·한글·.·_·-, 공백·숫자만 불가)")
     .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
     .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
     .action(async (name: string, options: { wait?: boolean }) => {

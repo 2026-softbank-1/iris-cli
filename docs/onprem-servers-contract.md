@@ -37,12 +37,16 @@ CLI                                          Control API                사용�
 | 명령 | 엔드포인트 | 처리 |
 |---|---|---|
 | `servers` (`list`) | `GET /onprem-servers` | 표로 보여 준다. 빈 목록이면 `servers add` 를 안내한다 |
-| `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 `ONPREM_SERVER_NAME_CONFLICT` → 같은 이름 안내, 409 `ONPREM_SERVER_LIMIT_EXCEEDED` → 한 사람당 5대 한도 안내(다른 409 는 서버 메시지를 붙여 안내), 422 → 1~63자 안내, 503 `NOT_CONFIGURED` → 서버 등록이 아직 준비되지 않았다고 안내 |
+| `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 `ONPREM_SERVER_NAME_CONFLICT` → 같은 이름 안내, 409 `ONPREM_SERVER_LIMIT_EXCEEDED` → 한 사람당 5대 한도 안내(다른 409 는 서버 메시지를 붙여 안내), 422 → 이름 규칙 안내(서버가 `details[].reason` 으로 준 사유를 풀어 알린다: 빈 이름·63자 초과·숫자만·시작 글자·허용 문자), 503 `NOT_CONFIGURED` → 서버 등록이 아직 준비되지 않았다고 안내 |
 | `servers add`·`token` 의 기다리기 | `GET /onprem-servers/{id}` | 3초마다. 상태가 바뀔 때만 찍는다. `CONNECTED` 면 성공, `FAILED` 면 `failureCode` 와 `servers token` 안내로 실패. 5xx·연결 끊김은 연속 5회까지 다시 확인하고, 4xx 는 바로 끝낸다. Ctrl+C 나 20분이 지나면 등록은 남는다고 알리고 끝낸다. 대화형 터미널이 아니면 기본으로 부르지 않는다(`--wait`·`--no-wait` 로 바꾼다) |
 | `servers token <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `POST /onprem-servers/{id}/registration-token` → `{server, registrationToken, installCommand}` | 대기·연결 중·실패 상태에서 되고 상태는 대기로 돌아간다. 409 `INVALID_STATUS_TRANSITION`(연결됨) → 상태와 함께 안내, 503 `NOT_CONFIGURED` → 준비 중 안내 |
 | `servers remove <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `DELETE /onprem-servers/{id}` → 204 | 확인을 묻는다(`--yes` 면 생략, 비대화형이면 `--yes` 필수). 409 `ONPREM_SERVER_IN_USE` → 서비스를 먼저 지우라고 안내 |
 | `services create` | `GET /projects` · `GET /targets` · (서버 타깃이 있으면) `GET /onprem-servers` · `POST /projects/{projectId}/services` | 아래 참고 |
 | `up` | `GET /services/{id}` · `GET /targets` · (연결 전이고 `onpremServerName` 이 없으면) `GET /onprem-servers/{id}` | 아래 참고 |
+
+### 서버 이름 규칙
+
+서버(iris-was)가 판정한다. 앞뒤 공백을 자른 이름이 **1~63자, 영문 대소문자·숫자·한글 완성형(가-힣)·`.`·`_`·`-` 만, 첫 글자는 영문·숫자·한글, 숫자만으로는 안 됨**이어야 한다(`^(?![0-9]+$)[A-Za-z0-9가-힣][A-Za-z0-9가-힣._-]{0,62}$`). 같은 사용자의 삭제되지 않은 서버와 이름이 같으면 409 `ONPREM_SERVER_NAME_CONFLICT` 다(대소문자를 구분한다). 어기면 422 `INVALID_INPUT` 이고 `details` 는 `[{field:"name", reason}]` 이며 `reason` 은 영어 고정 문구다: `must not be blank`·`must be at most 63 characters`·`must not be only digits`·`must start with a letter, digit or Hangul syllable`·`may contain only letters, digits, Hangul syllables, '.', '_' and '-' (no spaces)`. 숫자만 이름을 막는 까닭은 CLI 의 `<이름|id>` 가 숫자를 id 로 먼저 읽어 `servers remove 1` 이 이름이 `1` 인 서버가 아니라 id 1 인 서버를 지울 수 있어서다. 이미 등록한 이름은 검사하지 않는다.
 
 ### `GET /targets` 에 더해진 필드
 
