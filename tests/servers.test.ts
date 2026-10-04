@@ -261,6 +261,34 @@ describe("runServersAdd", () => {
     });
   });
 
+  it.each([
+    ["must not be blank", "서버 이름을 입력해 주세요."],
+    ["must be at most 63 characters", "서버 이름은 63자 이하여야 합니다."],
+    ["must not be only digits", "숫자만으로 정할 수 없습니다"],
+    ["must start with a letter, digit or Hangul syllable", "영문·숫자·한글(가-힣)로 시작해야 합니다"],
+    ["may contain only letters, digits, Hangul syllables, '.', '_' and '-' (no spaces)", "공백은 쓸 수 없습니다"],
+  ])("서버가_이름을_거절하면_사유_%s_를_한글로_풀어_알린다", async (reason, message) => {
+    const t = await setup([
+      errorEnvelope(422, "INVALID_INPUT", "invalid onprem server name", {}, [{ field: "name", reason }]),
+    ]);
+
+    const failure = runServersAdd({ name: "bad name", wait: false }, t.deps);
+
+    await expect(failure).rejects.toThrow(message);
+    await expect(failure).rejects.toThrow('"bad name"');
+    await expect(failure).rejects.toMatchObject({ status: 422, code: "INVALID_INPUT", exitCode: 1 });
+  });
+
+  it("모르는_사유나_사유가_없는_422_는_이름_규칙_전체를_안내한다", async () => {
+    const unknown = await setup([
+      errorEnvelope(422, "INVALID_INPUT", "x", {}, [{ field: "name", reason: "something new" }]),
+    ]);
+    await expect(runServersAdd({ name: "x y", wait: false }, unknown.deps)).rejects.toThrow("이름 규칙: 앞뒤 공백을 뺀 1~63자");
+
+    const bare = await setup([errorEnvelope(422, "VALIDATION_ERROR", "invalid")]);
+    await expect(runServersAdd({ name: "x y", wait: false }, bare.deps)).rejects.toThrow("영문·숫자·한글(가-힣)");
+  });
+
   it("서버_이름이_비어_있으면_사용법_오류다", async () => {
     const t = await setup([]);
 

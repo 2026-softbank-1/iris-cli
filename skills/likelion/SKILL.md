@@ -90,7 +90,7 @@ likelion env push .env --yes           # 파일 내용으로 전체 교체! 파�
 
 ```bash
 likelion servers --json                                  # 등록한 서버와 연결 상태 (CONNECTED 여야 배포된다)
-likelion servers add <이름> --no-wait                    # 서버에서 실행할 설치 명령을 출력한다 (사용자가 서버에서 sudo 로 실행)
+likelion servers add <이름> --no-wait                    # 서버에서 실행할 설치 명령을 출력한다 (사용자가 서버에서 sudo 로 실행). 이름: 1~63자, 영문·숫자·한글·.·_·- (공백·숫자만 불가)
 likelion services create --repo <url> --target <서버 이름> --project <이름|id> --link
 ```
 

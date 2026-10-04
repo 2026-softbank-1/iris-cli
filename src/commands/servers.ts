@@ -9,7 +9,7 @@ import {
   UsageError,
 } from "../lib/errors.js";
 import { formatTable } from "../lib/format.js";
-import { printInstallCommand, serverStatusLabel } from "../lib/onprem.js";
+import { describeServerNameRejection, printInstallCommand, serverStatusLabel } from "../lib/onprem.js";
 import { printJson } from "../lib/output.js";
 import { type Ask, confirm, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
@@ -115,7 +115,7 @@ export async function runServersAdd(
       throw explainApiError(error, `서버를 등록할 수 없습니다 (${error.message}). \`likelion servers\` 로 확인해 주세요.`);
     }
     if (error instanceof ApiError && error.status === 422) {
-      throw explainApiError(error, `서버 이름을 쓸 수 없습니다: ${name}. 1~63자로 정해 주세요.`);
+      throw explainApiError(error, describeServerNameRejection(name, error.details));
     }
     throw error;
   }
