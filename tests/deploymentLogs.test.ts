@@ -152,6 +152,66 @@ describe("runDeploymentLogs --build", () => {
   });
 });
 
+describe("runDeploymentLogs --build tail", () => {
+  const entries = (...messages: string[]) => messages.map((message, index) => ({ timestampNs: ns(`2026-10-03T00:00:${String(10 + index).padStart(2, "0")}Z`), message }));
+
+  it("tail_이면_여러_쪽을_읽어도_마지막_N줄만_보이고_전체_줄_수를_알린다", async () => {
+    const t = await setup([
+      page(entries("a", "b", "c"), { nextCursor: "c1" }),
+      page(entries("d", "e"), { nextCursor: "c2" }),
+      page([], { nextCursor: "c2", isComplete: true }),
+    ]);
+
+    await t.run({ kind: "build", tail: 2 });
+
+    expect(t.lines()).toEqual(["2026-10-03T00:00:10.000Z d", "2026-10-03T00:00:11.000Z e"]);
+    expect(t.warn).toHaveBeenCalledWith("마지막 2줄만 보여 줬습니다 (전체 5줄). -n 으로 늘릴 수 있습니다.");
+  });
+
+  it("tail_보다_로그가_적으면_전부_보이고_줄였다는_안내는_없다", async () => {
+    const t = await setup([page(entries("a", "b")), page([], { isComplete: true })]);
+
+    await t.run({ kind: "build", tail: 50 });
+
+    expect(t.lines()).toHaveLength(2);
+    expect(t.warn).not.toHaveBeenCalled();
+  });
+
+  it("tail_이_없으면_전부_보인다", async () => {
+    const t = await setup([page(entries("a", "b", "c")), page([], { isComplete: true })]);
+
+    await t.run({ kind: "build" });
+
+    expect(t.lines()).toHaveLength(3);
+  });
+
+  it("follow_에서는_쌓여_있던_로그만_마지막_N줄로_줄이고_새_로그는_바로_보인다", async () => {
+    const t = await setup([
+      page(entries("a", "b", "c")),
+      page([]),
+      detail("BUILDING"),
+      page(entries("d")),
+      page([], { isComplete: true }),
+    ]);
+
+    await t.run({ kind: "build", follow: true, tail: 2 });
+
+    expect(t.lines()).toEqual([
+      "2026-10-03T00:00:11.000Z b",
+      "2026-10-03T00:00:12.000Z c",
+      "2026-10-03T00:00:10.000Z d",
+    ]);
+    expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("전체 3줄"));
+  });
+
+  it.each([0, 1001, 1.5])("tail_%s_는_서버를_부르기_전에_멈춘다", async (tail) => {
+    const t = await setup([]);
+
+    await expect(t.run({ kind: "build", tail })).rejects.toMatchObject({ exitCode: 2, code: "USAGE" });
+    expect(t.calls).toHaveLength(0);
+  });
+});
+
 describe("runDeploymentLogs --deploy · --network", () => {
   it("deploy_는_이_배포의_런타임_로그를_조건으로_조회한다", async () => {
     const t = await setup([

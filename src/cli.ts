@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { runDeploy } from "./commands/deploy.js";
-import { type DeploymentLogKind, runDeploymentLogs } from "./commands/deploymentLogs.js";
 import { runDeploymentsList, runDeploymentsShow } from "./commands/deployments.js";
 import { runDiagnose } from "./commands/diagnose.js";
 import { runEnvList, runEnvPull, runEnvPush, runEnvSet, runEnvUnset } from "./commands/env.js";
@@ -9,14 +8,13 @@ import { runFix } from "./commands/fix.js";
 import { runLink } from "./commands/link.js";
 import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
-import { runLogs } from "./commands/logs.js";
+import { type LogsCommandOptions, runLogsCommand } from "./commands/logsCommand.js";
 import { runOpen } from "./commands/open.js";
 import { runSetupAgent } from "./commands/setup.js";
 import { runStatus } from "./commands/status.js";
 import { runUp } from "./commands/up.js";
 import { runWhoami } from "./commands/whoami.js";
 import { DEFAULT_API_URL, resolveApiUrl } from "./lib/config.js";
-import { UsageError } from "./lib/errors.js";
 import { createAsk } from "./lib/prompt.js";
 
 export interface ProgramOptions {
@@ -91,7 +89,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .description("연결된 서비스의 런타임 로그를 보여 준다 (--build·--deploy·--network 면 배포 하나의 로그)")
     .option("-f, --follow", "새 로그를 계속 따라간다 (런타임·--build)", false)
     .option("--since <duration>", "조회 기간 (예: 30m, 1h, 2d, 최대 7d). 런타임 로그만", "1h")
-    .option("-n, --limit <count>", "최대 줄 수 (1~1000). --build 는 무시한다", "200")
+    .option("-n, --limit <count>", "최대 줄 수 (1~1000). --build 는 마지막 N줄만 보여 준다(생략하면 전부)", "200")
     .option("--search <text>", "이 문자열이 든 줄만 본다 (대소문자 구분). 런타임·--deploy")
     .option("--target <id|name>", "배포 타깃 (타깃이 여러 개일 때)")
     .option("--build", "배포의 빌드 로그(CodeBuild)를 본다", false)
@@ -100,52 +98,9 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .option("--deployment <id>", "--build·--deploy·--network 대상 배포 번호 (기본: 가장 최근 배포)")
     .option("--status-class <class>", "--network 의 응답 코드 범위 (2xx·3xx·4xx·5xx)")
     .option("--json", "줄마다 로그 항목을 JSON 한 줄로 낸다 (JSON Lines)", false)
-    .action(
-      async (options: {
-        follow: boolean;
-        since: string;
-        limit: string;
-        search?: string;
-        target?: string;
-        build: boolean;
-        deploy: boolean;
-        network: boolean;
-        deployment?: string;
-        statusClass?: string;
-        json: boolean;
-      }) => {
-        const kinds: DeploymentLogKind[] = [];
-        if (options.build) kinds.push("build");
-        if (options.deploy) kinds.push("deploy");
-        if (options.network) kinds.push("network");
-        if (kinds.length > 1) throw new UsageError("--build·--deploy·--network 는 하나만 고를 수 있습니다.");
-        const [kind] = kinds;
-        if (kind === undefined) {
-          if (options.deployment !== undefined || options.statusClass !== undefined) {
-            throw new UsageError("--deployment·--status-class 는 --build·--deploy·--network 와 함께 써야 합니다.");
-          }
-          await runLogs({
-            follow: options.follow,
-            since: options.since,
-            limit: Number(options.limit),
-            search: options.search,
-            target: options.target,
-            json: options.json,
-          });
-          return;
-        }
-        await runDeploymentLogs({
-          kind,
-          deployment: options.deployment,
-          follow: options.follow,
-          limit: Number(options.limit),
-          search: options.search,
-          target: options.target,
-          statusClass: options.statusClass,
-          json: options.json,
-        });
-      },
-    );
+    .action(async (options: LogsCommandOptions, command: Command) => {
+      await runLogsCommand(options, command.getOptionValueSource("limit"));
+    });
 
   program
     .command("open")
