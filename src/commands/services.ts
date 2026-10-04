@@ -2,6 +2,7 @@ import type { ApiClient, FetchLike } from "../lib/api.js";
 import { ApiError, CliError } from "../lib/errors.js";
 import { findGitOrigin } from "../lib/git.js";
 import { type Link, saveLink } from "../lib/link.js";
+import { printJson, progressLog } from "../lib/output.js";
 import { serverStatusLabel } from "../lib/onprem.js";
 import { pickProject } from "../lib/project.js";
 import { type Ask, confirm, matchByIdOrName, pickOne } from "../lib/prompt.js";
@@ -22,6 +23,8 @@ export interface ServicesCreateOptions {
   target?: string;
   /** 만든 뒤 현재 폴더를 연결할지. 없으면 대화형 터미널에서만 묻는다 */
   link?: boolean;
+  /** 진행 안내는 stderr 로 보내고 stdout 에는 만든 서비스 JSON 만 낸다 */
+  json?: boolean;
 }
 
 export interface ServicesCreateDeps {
@@ -57,8 +60,9 @@ export async function runServicesCreate(
   options: ServicesCreateOptions,
   deps: ServicesCreateDeps = {},
 ): Promise<Service> {
-  const log = deps.log ?? console.log;
+  const out = deps.log ?? console.log;
   const warn = deps.warn ?? console.error;
+  const log = progressLog(options.json ?? false, out, warn);
   const cwd = deps.cwd ?? process.cwd();
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
@@ -89,6 +93,7 @@ export async function runServicesCreate(
     `서비스를 만들었습니다: ${project.name} / ${service.name} (서비스 ${service.id}, 브랜치 ${service.sourceBranch}, 타깃 ${targetName})`,
   );
   await offerLink(project, service, { option: options.link, ask: deps.ask, cwd, apiUrl: credentials.apiUrl, log });
+  if (options.json) printJson(service, out);
   return service;
 }
 

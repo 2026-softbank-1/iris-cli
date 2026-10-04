@@ -4,9 +4,11 @@ import {
   CliError,
   describeTransientFailure,
   isTransientFailure,
+  UsageError,
 } from "../lib/errors.js";
 import { formatTable } from "../lib/format.js";
 import { printInstallCommand, serverStatusLabel } from "../lib/onprem.js";
+import { printJson } from "../lib/output.js";
 import { type Ask, confirm, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
 import type { OnpremServer, OnpremServerRegistration } from "../lib/types.js";
@@ -37,14 +39,25 @@ export interface ServersDeps {
   isInteractive?: boolean;
 }
 
+export interface ServersListOptions {
+  json?: boolean;
+}
+
 /** 내 서버 목록을 보여 준다. */
-export async function runServersList(deps: ServersDeps = {}): Promise<OnpremServer[]> {
+export async function runServersList(
+  options: ServersListOptions = {},
+  deps: ServersDeps = {},
+): Promise<OnpremServer[]> {
   const log = deps.log ?? console.log;
   const { api, credentials } = await requireSession(deps.fetchImpl);
 
   const servers = await api.request<OnpremServer[]>("GET", "/onprem-servers", {
     token: credentials.token,
   });
+  if (options.json) {
+    printJson(servers, log);
+    return servers;
+  }
   if (servers.length === 0) {
     log(NO_SERVERS_MESSAGE);
     return servers;
@@ -176,7 +189,7 @@ export async function runServersRemove(
 
   if (!options.yes) {
     if (!deps.ask) {
-      throw new CliError("대화형 터미널이 아니라 삭제를 확인할 수 없습니다. --yes 를 붙여 다시 실행해 주세요.");
+      throw new UsageError("대화형 터미널이 아니라 삭제를 확인할 수 없습니다. --yes 를 붙여 다시 실행해 주세요.");
     }
     const isConfirmed = await confirm(
       deps.ask,

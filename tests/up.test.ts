@@ -8,6 +8,7 @@ import {
   fakeFetch,
   linkTo,
   loginAs,
+  ns,
   useTempConfigDir,
   useTempCwd,
 } from "./helpers.js";
@@ -105,6 +106,34 @@ describe("runUp", () => {
     expect(lines).toContain("  SUCCEEDED (+6s)");
     expect(lines).toContain("배포가 완료되었습니다.");
     expect(lines).toContain("주소  https://web-3.likelion.uk (aws)");
+  });
+
+  it("logs_이면_기다리는_동안_빌드_로그를_이어_보여_준다", async () => {
+    const t = await setup([
+      upload(),
+      created(),
+      detail("BUILDING"),
+      envelope({ entries: [{ timestampNs: ns("2026-10-03T00:00:10Z"), message: "[Container] npm ci" }], nextCursor: "c1", isComplete: false }),
+      envelope({ entries: [], nextCursor: "c1", isComplete: false }),
+      detail("SUCCEEDED"),
+      envelope({ entries: [], nextCursor: "c1", isComplete: true }),
+      domains(),
+    ]);
+
+    await runUp({ detach: false, logs: true }, t.deps);
+
+    expect(t.lines()).toContain("2026-10-03T00:00:10.000Z [Container] npm ci");
+    expect(t.lines()).toContain("배포가 완료되었습니다.");
+  });
+
+  it("json_이면_진행_안내는_stderr_로_보내고_stdout_에는_배포_상세_JSON_만_낸다", async () => {
+    const t = await setup([upload(), created(), detail("SUCCEEDED"), domains()]);
+
+    await runUp({ detach: false, json: true }, t.deps);
+
+    expect(t.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(t.lines()[0] ?? "")).toMatchObject({ id: 12, status: "SUCCEEDED" });
+    expect(t.warn.mock.calls.map(([line]) => line)).toContain("배포가 완료되었습니다.");
   });
 
   it("detach_이면_배포_요청만_보내고_기다리지_않는다", async () => {

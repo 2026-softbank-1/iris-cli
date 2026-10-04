@@ -38,7 +38,7 @@ describe("runStatus", () => {
     ]);
     const log = vi.fn();
 
-    await runStatus({ fetchImpl, cwd: cwd(), log });
+    await runStatus({}, { fetchImpl, cwd: cwd(), log });
 
     expect(log.mock.calls.map(([line]) => line)).toEqual([
       "web (서비스 3, 프로젝트 demo)",
@@ -62,7 +62,7 @@ describe("runStatus", () => {
     ]);
     const log = vi.fn();
 
-    await runStatus({ fetchImpl, cwd: cwd(), log });
+    await runStatus({}, { fetchImpl, cwd: cwd(), log });
 
     const lines = log.mock.calls.map(([line]) => line);
     expect(lines).toContain("상태  FAILED");
@@ -86,7 +86,7 @@ describe("runStatus", () => {
     ]);
     const log = vi.fn();
 
-    await runStatus({ fetchImpl, cwd: cwd(), log });
+    await runStatus({}, { fetchImpl, cwd: cwd(), log });
 
     expect(log).toHaveBeenCalledWith("단계  QUEUED 0.0s → DEPLOYING 21s → SUCCEEDED");
   });
@@ -107,7 +107,7 @@ describe("runStatus", () => {
     ]);
     const log = vi.fn();
 
-    await runStatus({ fetchImpl, cwd: cwd(), log });
+    await runStatus({}, { fetchImpl, cwd: cwd(), log });
 
     expect(log).toHaveBeenCalledWith("커밋  upload-46cce13380d1");
   });
@@ -121,7 +121,7 @@ describe("runStatus", () => {
     ]);
     const log = vi.fn();
 
-    await runStatus({ fetchImpl, cwd: cwd(), log });
+    await runStatus({}, { fetchImpl, cwd: cwd(), log });
 
     expect(log).toHaveBeenCalledWith("배포 이력이 없습니다.");
     expect(calls).toHaveLength(2);
@@ -130,6 +130,36 @@ describe("runStatus", () => {
   it("연결되지_않은_폴더면_link_안내", async () => {
     await loginAs();
 
-    await expect(runStatus({ cwd: cwd(), log: vi.fn() })).rejects.toThrow("likelion link");
+    await expect(runStatus({}, { cwd: cwd(), log: vi.fn() })).rejects.toThrow("likelion link");
+  });
+
+  it("json_이면_서비스_최근_배포_상세_주소를_JSON_하나로_낸다", async () => {
+    await loginAs();
+    await linkTo(cwd());
+    const { fetchImpl } = fakeFetch([
+      envelope({ id: 3, projectId: 1, name: "web", targetIds: [1], latestDeployment: latest }),
+      envelope([{ targetId: 1, targetName: "aws", isConnected: true, url: "https://web-3.likelion.uk" }]),
+      envelope({ ...latest, stages: [] }),
+    ]);
+    const log = vi.fn();
+
+    await runStatus({ json: true }, { fetchImpl, cwd: cwd(), log });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const output = JSON.parse(log.mock.calls[0]?.[0] as string);
+    expect(output.service.name).toBe("web");
+    expect(output.deployment).toMatchObject({ id: 9, status: "SUCCEEDED" });
+    expect(output.domains[0].url).toBe("https://web-3.likelion.uk");
+  });
+
+  it("json_이고_배포_이력이_없으면_deployment_는_null_이다", async () => {
+    await loginAs();
+    await linkTo(cwd());
+    const { fetchImpl } = fakeFetch([envelope({ id: 3, projectId: 1, name: "web", targetIds: [1] }), envelope([])]);
+    const log = vi.fn();
+
+    await runStatus({ json: true }, { fetchImpl, cwd: cwd(), log });
+
+    expect(JSON.parse(log.mock.calls[0]?.[0] as string).deployment).toBeNull();
   });
 });

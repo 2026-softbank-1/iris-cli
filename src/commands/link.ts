@@ -1,5 +1,6 @@
 import type { FetchLike } from "../lib/api.js";
 import { type Link, saveLink } from "../lib/link.js";
+import { printJson, progressLog } from "../lib/output.js";
 import { pickProject } from "../lib/project.js";
 import { type Ask, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
@@ -8,6 +9,8 @@ import type { Service } from "../lib/types.js";
 export interface LinkOptions {
   project?: string;
   service?: string;
+  /** 진행 안내는 stderr 로 보내고 stdout 에는 연결 정보 JSON 만 낸다 */
+  json?: boolean;
 }
 
 export interface LinkDeps {
@@ -15,11 +18,13 @@ export interface LinkDeps {
   ask?: Ask;
   cwd?: string;
   log?: (message: string) => void;
+  warn?: (message: string) => void;
 }
 
 /** 프로젝트·서비스를 골라 현재 폴더에 연결 정보를 저장한다. */
 export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promise<Link> {
-  const log = deps.log ?? console.log;
+  const out = deps.log ?? console.log;
+  const log = progressLog(options.json ?? false, out, deps.warn ?? console.error);
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
 
@@ -46,5 +51,6 @@ export async function runLink(options: LinkOptions, deps: LinkDeps = {}): Promis
   };
   const path = await saveLink(deps.cwd ?? process.cwd(), link);
   log(`${project.name} / ${service.name} 에 연결했습니다. (${path})`);
+  if (options.json) printJson(link, out);
   return link;
 }

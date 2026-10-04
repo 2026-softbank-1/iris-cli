@@ -1,4 +1,4 @@
-import { ApiError, type ApiErrorDetail, CliError, ConnectionError } from "./errors.js";
+import { ApiError, type ApiErrorDetail, AuthError, type CliError, ConnectionError } from "./errors.js";
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -30,6 +30,9 @@ export type FetchLike = typeof fetch;
 
 export const SESSION_EXPIRED_MESSAGE =
   "세션이 만료되었습니다. `likelion login` 을 다시 실행해 주세요.";
+
+export const ENV_TOKEN_REJECTED_MESSAGE =
+  "LIKELION_TOKEN 이 올바르지 않거나 만료되었습니다. 새 토큰으로 바꾸거나, 환경변수를 지우고 `likelion login` 을 실행해 주세요.";
 
 /** Control API 의 `ApiResponse` 봉투를 벗겨 `data` 만 돌려주는 얇은 클라이언트. */
 export class ApiClient {
@@ -103,7 +106,11 @@ function failure(
   envelope: ApiEnvelope<unknown> | null,
   token: string | undefined,
 ): CliError {
-  if (response.status === 401 && token) return new CliError(SESSION_EXPIRED_MESSAGE);
+  if (response.status === 401 && token) {
+    return new AuthError(
+      token === process.env.LIKELION_TOKEN?.trim() ? ENV_TOKEN_REJECTED_MESSAGE : SESSION_EXPIRED_MESSAGE,
+    );
+  }
   return new ApiError(
     envelope?.message ?? `요청이 실패했습니다 (HTTP ${response.status})`,
     response.status,

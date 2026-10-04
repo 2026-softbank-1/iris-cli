@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { CliError } from "./errors.js";
+import { CliError, UsageError } from "./errors.js";
 
 export interface Choice {
   id: number;
@@ -8,9 +8,26 @@ export interface Choice {
 
 export type Ask = (question: string) => Promise<string>;
 
-/** 대화형 터미널일 때만 질문할 수 있다. 파이프·CI 에서는 undefined. */
+// 이 환경변수가 있으면 에이전트가 실행한 것으로 보고 질문하지 않는다(터미널 흉내를 내는 pty 에서도).
+const AGENT_ENV_VARS = ["CLAUDECODE", "AI_AGENT", "AGENT"];
+
+function isSet(value: string | undefined): boolean {
+  return value !== undefined && value !== "" && value !== "0" && value.toLowerCase() !== "false";
+}
+
+/** 사람이 답할 수 있는 대화형 실행인지. 파이프·CI·에이전트·`LIKELION_NON_INTERACTIVE` 면 아니다. */
+export function isInteractive(
+  env: Record<string, string | undefined> = process.env,
+  stdinIsTTY: boolean | undefined = process.stdin.isTTY,
+): boolean {
+  if (!stdinIsTTY) return false;
+  if (isSet(env.CI) || isSet(env.LIKELION_NON_INTERACTIVE)) return false;
+  return !AGENT_ENV_VARS.some((name) => isSet(env[name]));
+}
+
+/** 대화형일 때만 질문할 수 있다. 아니면 undefined 이고 명령은 필요한 값을 옵션으로 받는다. */
 export function createAsk(): Ask | undefined {
-  if (!process.stdin.isTTY) return undefined;
+  if (!isInteractive()) return undefined;
   return async (question) => {
     const readline = createInterface({ input: process.stdin, output: process.stdout });
     try {
@@ -75,7 +92,7 @@ export async function pickOne<T extends Choice>(
   }
 
   if (!ask) {
-    throw new CliError(
+    throw new UsageError(
       `대화형 터미널이 아니라 ${label} 을 고를 수 없습니다. ${flag} 로 지정해 주세요. 가능한 값: ${describe(items)}`,
     );
   }

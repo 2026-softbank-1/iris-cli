@@ -71,7 +71,7 @@ describe("runServersList", () => {
       ),
     ]);
 
-    await runServersList(t.deps);
+    await runServersList({}, t.deps);
 
     expect(t.pathOf(0)).toBe("/api/v1/onprem-servers");
     expect(t.calls[0]?.headers.Authorization).toBe("Bearer jwt-1");
@@ -87,7 +87,7 @@ describe("runServersList", () => {
   it("서버가_없으면_servers_add_를_안내한다", async () => {
     const t = await setup([envelope([])]);
 
-    await runServersList(t.deps);
+    await runServersList({}, t.deps);
 
     expect(t.lines()).toEqual([
       "등록한 서버가 없습니다. `likelion servers add <이름>` 으로 서버를 등록하세요.",
@@ -95,7 +95,7 @@ describe("runServersList", () => {
   });
 
   it("로그인_전이면_login_안내", async () => {
-    await expect(runServersList({ log: vi.fn() })).rejects.toThrow("likelion login");
+    await expect(runServersList({}, { log: vi.fn() })).rejects.toThrow("likelion login");
   });
 });
 
@@ -414,5 +414,16 @@ describe("runServersRemove", () => {
     await expect(runServersRemove({ server: "home-lab", yes: true }, t.deps)).rejects.toThrow(
       "이 서버에 배포하는 서비스가 있어 삭제할 수 없습니다: home-lab. 그 서비스를 먼저 삭제해 주세요.",
     );
+  });
+});
+
+describe("runServersList json", () => {
+  it("json_이면_서버_목록을_그대로_JSON_으로_낸다", async () => {
+    const t = await setup([serverList(server({ status: "CONNECTED" }))]);
+
+    await runServersList({ json: true }, t.deps);
+
+    expect(t.lines()).toHaveLength(1);
+    expect(JSON.parse(t.lines()[0] ?? "")[0]).toMatchObject({ name: "home-lab", status: "CONNECTED" });
   });
 });

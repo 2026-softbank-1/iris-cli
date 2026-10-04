@@ -1,12 +1,14 @@
+import { CommanderError } from "commander";
 import { buildProgram } from "./cli.js";
-import { CliError } from "./lib/errors.js";
+import { reportCommanderError, reportError, wantsJson } from "./lib/report.js";
+
+const json = wantsJson(process.argv.slice(2));
 
 try {
-  await buildProgram().parseAsync();
+  await buildProgram({ quietParseErrors: json }).parseAsync();
 } catch (error) {
-  if (error instanceof CliError) {
-    console.error(error.message);
-    process.exit(error.exitCode);
-  }
-  throw error;
+  if (error instanceof CommanderError) process.exit(reportCommanderError(error, { json }));
+  const exitCode = reportError(error, { json });
+  if (exitCode === undefined) throw error;
+  process.exit(exitCode);
 }

@@ -1,0 +1,39 @@
+# 개발자 문서
+
+README 에서 옮긴 개발자용 내용이다. 서버와 맞출 계약은 [login-contract.md](login-contract.md)·[up-contract.md](up-contract.md) 에 있다.
+
+## 사용하는 API
+
+| 명령 | 엔드포인트 |
+|---|---|
+| `link` | `GET /projects` · `GET /projects/{id}/services` |
+| `status` | `GET /services/{id}` · `GET /services/{id}/domains` · `GET /services/{id}/deployments/{deploymentId}` |
+| `logs` | `GET /services/{id}/logs` · `GET /services/{id}/logs/stream`(SSE) · `GET /targets` |
+| `login` | `POST /auth/cli/sessions` · `POST /auth/cli/sessions/{sessionId}/token`(폴링, `429` 면 `Retry-After` 만큼 쉬고 재시도) · `GET /me` |
+| `open` | `GET /services/{id}/domains` |
+| `up` | `POST /services/{id}/uploads`(본문 = tar.gz) · `POST /services/{id}/deployments`(`triggerType=CLI`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `deployments` | `GET /services/{id}/deployments` · `GET /services/{id}/deployments/{deploymentId}` |
+| `deploy`·`redeploy`·`rollback`·`restart` | `POST /services/{id}/deployments`(`triggerType=MANUAL`·`REDEPLOY`·`ROLLBACK`·`RESTART`, `Idempotency-Key`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `logs --build`·`--deploy`·`--network`, `up --logs` | `GET /services/{id}/deployments/{deploymentId}/build-logs`·`deploy-logs`·`network-logs` |
+| `env` | `GET`·`POST`·`PUT /services/{id}/variables` · `PUT`·`DELETE /services/{id}/variables/{key}` |
+| `services create` | `GET /projects` · `GET /targets` · `GET /onprem-servers` · `POST /projects/{id}/services` |
+| `servers` | `GET /onprem-servers` · `POST /onprem-servers` · `GET /onprem-servers/{id}`(폴링) · `POST /onprem-servers/{id}/registration-token` · `DELETE /onprem-servers/{id}` |
+| `diagnose` | `GET`·`POST /services/{id}/deployments/{deploymentId}/diagnosis`·`diagnose` |
+| `fix` | `GET …/diagnosis` · `GET …/repairs/latest?diagnosisId=` · `POST …/auto-repair`(`Idempotency-Key`) · `POST /services/{id}/repairs/{repairId}/auto` · `GET /services/{id}/repairs/{repairId}`(폴링) · `GET /services/{id}/repair-access`(403 일 때) |
+
+## 릴리스
+
+GitHub Actions 로 자동화하지 않았다. 버전을 올릴 때 손으로 한다.
+
+1. `npm version <버전> --no-git-tag-version` 으로 `package.json`·`package-lock.json` 을 올리고 PR 로 `main` 에 병합한다.
+2. 병합된 `main` 에서 `npm ci && npm run build && npm pack` 으로 `likelion-<버전>.tgz` 를 만든다.
+3. `gh release create v<버전> likelion-<버전>.tgz --target <main 커밋> --title "v<버전>" --notes "<변경 내용>"` 으로 릴리스를 만든다.
+4. [README](../README.md#설치) 설치 명령의 주소를 새 버전으로 바꾼 뒤 설치해 `likelion --version` 이 맞는지 확인한다.
+
+## 규칙
+
+- 서버 응답은 `ApiResponse` 봉투(`success`·`code`·`message`·`data`)이고 JSON 키는 camelCase 다. 봉투는 `src/lib/api.ts` 한 곳에서 벗긴다.
+- 사용자에게 보일 오류는 `CliError` 로 던진다. 종류에 따라 `UsageError`(2)·`AuthError`(3)·`ResultError`(4)를 쓰고 서버 오류(`ApiError`)는 HTTP 상태로 1·3·5 가 정해진다. `src/index.ts` 가 `src/lib/report.ts` 로 메시지(또는 `--json` 이면 오류 JSON 한 줄)와 종료 코드를 내고 끝낸다. 종료 코드 표는 [agents.md](agents.md#종료-코드).
+- `--json` 이 있는 명령은 서버 응답의 `data` 만 stdout 에 내고 진행 안내는 stderr 로 보낸다(`src/lib/output.ts`).
+- 명령을 추가·변경하면 `skills/likelion/SKILL.md` 도 같이 고친다(테스트가 명령·옵션과의 일치를 검사한다).
+- 커밋 메시지는 Conventional Commits(`feat: 설명`), 한글, 명령형으로 쓴다.
