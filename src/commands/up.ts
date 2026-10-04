@@ -4,7 +4,7 @@ import type { ApiClient, FetchLike } from "../lib/api.js";
 import { createArchive } from "../lib/archive.js";
 import { createBuildLogFollower } from "../lib/buildLogs.js";
 import { reportResult, waitForDeployment } from "../lib/deployment.js";
-import { ApiError, CliError } from "../lib/errors.js";
+import { ApiError, CliError, EXIT, explainApiError } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { requireLinkLocation } from "../lib/link.js";
 import { serverStatusLabel } from "../lib/onprem.js";
@@ -90,7 +90,8 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
       );
     } catch (error) {
       if (error instanceof ApiError && error.code === "TARGET_NOT_CONNECTED") {
-        throw new CliError(
+        throw explainApiError(
+          error,
           "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
         );
       }
@@ -138,6 +139,8 @@ async function ensureTargetConnected(api: ApiClient, token: string, serviceId: n
   const name = blocked.onpremServerName ?? (await findServerName(api, token, blocked)) ?? blocked.name;
   throw new CliError(
     `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요. 상태는 \`likelion servers\` 로 확인합니다.`,
+    EXIT.FAILURE,
+    "TARGET_NOT_CONNECTED",
   );
 }
 
