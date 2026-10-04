@@ -12,6 +12,12 @@ README 에서 옮긴 개발자용 내용이다. 서버와 맞출 계약은 [logi
 | `login` | `POST /auth/cli/sessions` · `POST /auth/cli/sessions/{sessionId}/token`(폴링, `429` 면 `Retry-After` 만큼 쉬고 재시도) · `GET /me` |
 | `open` | `GET /services/{id}/domains` |
 | `up` | `POST /services/{id}/uploads`(본문 = tar.gz) · `POST /services/{id}/deployments`(`triggerType=CLI`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `deployments` | `GET /services/{id}/deployments` · `GET /services/{id}/deployments/{deploymentId}` |
+| `deploy`·`redeploy`·`rollback`·`restart` | `POST /services/{id}/deployments`(`triggerType=MANUAL`·`REDEPLOY`·`ROLLBACK`·`RESTART`, `Idempotency-Key`) · `GET /services/{id}/deployments/{deploymentId}`(폴링) · `GET /services/{id}/domains` |
+| `logs --build`·`--deploy`·`--network`, `up --logs` | `GET /services/{id}/deployments/{deploymentId}/build-logs`·`deploy-logs`·`network-logs` |
+| `env` | `GET`·`POST`·`PUT /services/{id}/variables` · `PUT`·`DELETE /services/{id}/variables/{key}` |
+| `diagnose` | `GET`·`POST /services/{id}/deployments/{deploymentId}/diagnosis`·`diagnose` |
+| `fix` | `GET …/diagnosis` · `GET …/repairs/latest?diagnosisId=` · `POST …/auto-repair`(`Idempotency-Key`) · `POST /services/{id}/repairs/{repairId}/auto` · `GET /services/{id}/repairs/{repairId}`(폴링) · `GET /services/{id}/repair-access`(403 일 때) |
 
 ## 릴리스
 

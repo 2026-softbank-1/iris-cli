@@ -27,6 +27,8 @@ export interface Service {
   id: number;
   projectId: number;
   name: string;
+  sourceRepositoryUrl: string;
+  sourceBranch: string;
   targetIds: number[];
   latestDeployment?: LatestDeployment;
 }
@@ -38,8 +40,63 @@ export interface DeploymentStage {
   durationSeconds?: number;
 }
 
+/** 배포 요청 1건(목록 항목·생성 응답). 서버는 null 필드를 뺀다. */
+export interface Deployment extends LatestDeployment {
+  serviceId: number;
+  /** 재배포·롤백·재시작이 따라간 원본 배포 */
+  sourceDeploymentId?: number;
+  isActive: boolean;
+  requestedDeploymentStrategy?: string;
+  deploymentStrategy?: string;
+}
+
+export interface DeploymentHistory {
+  fromStatus?: string;
+  toStatus: string;
+  failureCode?: string;
+  createdAt: string;
+}
+
+export interface DeploymentBuild {
+  status: string;
+  builder?: string;
+  imageDigest?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  failureCode?: string;
+}
+
+export interface DeploymentRelease {
+  id: number;
+  targetId: number;
+  status: string;
+  argoSyncStatus?: string;
+  argoHealthStatus?: string;
+  gitopsCommitSha?: string;
+  failureCode?: string;
+  finishedAt?: string;
+}
+
 export interface DeploymentDetail extends LatestDeployment {
   stages: DeploymentStage[];
+  serviceId?: number;
+  sourceDeploymentId?: number;
+  isActive?: boolean;
+  requestedDeploymentStrategy?: string;
+  deploymentStrategy?: string;
+  history?: DeploymentHistory[];
+  source?: { repository: string; branch: string };
+  configuration?: {
+    build?: { builder?: string; rootDirectory?: string; buildCommand?: string };
+    deploy?: {
+      targets?: { id: number; name: string; kind?: string }[];
+      port?: number;
+      startCommand?: string;
+    };
+  };
+  build?: DeploymentBuild;
+  releases?: DeploymentRelease[];
+  replacedBy?: { deploymentId: number; at: string };
 }
 
 export interface ServiceDomain {
@@ -65,4 +122,155 @@ export interface LogEntry {
 export interface LogsPage {
   entries: LogEntry[];
   isTruncated: boolean;
+}
+
+export interface BuildLogEntry {
+  timestampNs: string;
+  message: string;
+}
+
+export interface BuildLogsPage {
+  entries: BuildLogEntry[];
+  nextCursor?: string;
+  buildStatus?: string;
+  /** 빌드가 끝났고 이번 호출에서 읽은 줄이 없다. 폴링을 멈춘다. */
+  isComplete: boolean;
+  /** 앞부분이 빠진 끝부분만 받았다 */
+  isPartial?: boolean;
+  /** 롤백·재시작은 새로 빌드하지 않아 원본 배포의 로그다 */
+  loggedDeploymentId?: number;
+}
+
+export interface DeployLogsPage {
+  entries: LogEntry[];
+  isTruncated: boolean;
+}
+
+export interface NetworkLogEntry {
+  timestampNs: string;
+  status: number;
+  targetStatus?: number;
+  receivedBytes: number;
+  sentBytes: number;
+  responseTimeSeconds?: number;
+}
+
+export interface NetworkLogsPage {
+  entries: NetworkLogEntry[];
+  isTruncated: boolean;
+}
+
+export interface Variable {
+  key: string;
+  value: string;
+}
+
+export interface SystemVariable {
+  key: string;
+  description: string;
+  value?: string;
+}
+
+export interface ServiceVariables {
+  variables: Variable[];
+  systemVariables: SystemVariable[];
+}
+
+export type DiagnosisStatus = "RUNNING" | "SUCCEEDED" | "FAILED";
+
+export interface DiagnosisHypothesis {
+  id: string;
+  category: string;
+  supportLevel: string;
+  statement: string;
+  evidenceIds?: string[];
+  uncertainty?: string;
+}
+
+export interface DiagnosisChange {
+  kind: string;
+  target: string;
+  instruction: string;
+  language?: string;
+  snippet?: string;
+}
+
+export interface DiagnosisPlan {
+  id: string;
+  title: string;
+  applyWhen?: string[];
+  changes?: DiagnosisChange[];
+  verification?: { instruction: string; expectedResult: string }[];
+  rollback?: string[];
+  risks?: string[];
+}
+
+export interface DiagnosisAnalysis {
+  analysisStatus: string;
+  summary: string;
+  hypotheses?: DiagnosisHypothesis[];
+  nextChecks?: { target: string; method: string; purpose: string }[];
+  missingInformation?: { requestedData: string; reason: string }[];
+  limitations?: string[];
+  remediation?: { status: string; reason: string; plans?: DiagnosisPlan[] };
+}
+
+export interface EvidenceLine {
+  id: string;
+  sourceId: string;
+  stage: string;
+  text: string;
+}
+
+export interface SourceFinding {
+  path: string;
+  startLine: number;
+  endLine: number;
+  explanation: string;
+}
+
+export interface Diagnosis {
+  id: number;
+  deploymentId: number;
+  status: DiagnosisStatus;
+  errorCode?: string;
+  analysis?: DiagnosisAnalysis;
+  evidence?: EvidenceLine[];
+  sourceAnalysis?: { status: string; reason: string; findings?: SourceFinding[] };
+  inputLimitations?: string[];
+  createdAt: string;
+  finishedAt?: string;
+}
+
+export interface RepairPublication {
+  status: string;
+  branch?: string;
+  commitSha?: string;
+  pullUrl?: string;
+  mergeCommitSha?: string;
+  redeploymentId?: number;
+  errorCode?: string;
+}
+
+export interface Repair {
+  id: number;
+  deploymentId: number;
+  diagnosisId: number;
+  /** RUNNING · SUCCEEDED · FAILED · UNKNOWN_OUTCOME */
+  status: string;
+  sourceSha: string;
+  planIds: string[];
+  errorCode?: string;
+  createdAt: string;
+  finishedAt?: string;
+  publication?: RepairPublication;
+  autoMerge?: boolean;
+  autoRedeploy?: boolean;
+}
+
+export interface RepairAccess {
+  repository: string;
+  canWrite: boolean;
+  installationUrl: string;
+  reason?: string;
 }

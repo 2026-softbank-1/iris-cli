@@ -1,5 +1,5 @@
 import type { ApiClient, FetchLike } from "../lib/api.js";
-import { CliError, ConnectionError } from "../lib/errors.js";
+import { CliError, ConnectionError, UsageError } from "../lib/errors.js";
 import { formatTimestampNs, parseDuration } from "../lib/format.js";
 import { requireLink } from "../lib/link.js";
 import { matchByIdOrName } from "../lib/prompt.js";
@@ -19,6 +19,8 @@ export interface LogsOptions {
   limit: number;
   search?: string;
   target?: string;
+  /** 줄마다 서버가 준 로그 항목을 JSON 한 줄로 낸다(JSON Lines) */
+  json?: boolean;
 }
 
 export interface LogsDeps {
@@ -36,7 +38,7 @@ class StreamFatalError extends CliError {}
 
 /**
  * 서비스 런타임 로그를 보여 준다. 먼저 과거 로그를 조회하고, `follow` 면 그 뒤부터 SSE 로 이어 받는다.
- * 런타임 로그만 다룬다. 빌드 로그는 별도 API(`.../build-logs`)라 아직 쓰지 않는다.
+ * 런타임 로그만 다룬다. 배포별 빌드·런타임·네트워크 로그는 `deploymentLogs.ts` 가 맡는다.
  */
 export async function runLogs(options: LogsOptions, deps: LogsDeps = {}): Promise<void> {
   const log = deps.log ?? console.log;
@@ -44,9 +46,9 @@ export async function runLogs(options: LogsOptions, deps: LogsDeps = {}): Promis
   const now = deps.now ?? Date.now;
 
   const rangeMs = parseDuration(options.since);
-  if (rangeMs > MAX_RANGE_MS) throw new CliError("조회 기간은 최대 7일(7d)입니다.");
+  if (rangeMs > MAX_RANGE_MS) throw new UsageError("조회 기간은 최대 7일(7d)입니다.");
   if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > MAX_LIMIT) {
-    throw new CliError(`--limit 은 1 이상 ${MAX_LIMIT} 이하의 정수여야 합니다.`);
+    throw new UsageError(`--limit 은 1 이상 ${MAX_LIMIT} 이하의 정수여야 합니다.`);
   }
 
   const { api, credentials } = await requireSession(deps.fetchImpl);
@@ -66,7 +68,7 @@ export async function runLogs(options: LogsOptions, deps: LogsDeps = {}): Promis
     },
   });
 
-  const print = createPrinter(log);
+  const print = createPrinter(log, options.json ?? false);
   print(page.entries);
   if (page.entries.length === 0) warn("해당 기간에 로그가 없습니다.");
   if (page.isTruncated && !options.follow) {
@@ -89,7 +91,7 @@ export async function runLogs(options: LogsOptions, deps: LogsDeps = {}): Promis
   });
 }
 
-async function resolveTargetId(
+export async function resolveTargetId(
   api: ApiClient,
   token: string,
   serviceId: number,
@@ -112,7 +114,10 @@ async function resolveTargetId(
 }
 
 /** 같은 로그를 두 번 찍지 않는다. 스트림은 재연결 때 겹치는 구간을 다시 보낼 수 있다. */
-function createPrinter(log: (message: string) => void): (entries: LogEntry[]) => void {
+function createPrinter(
+  log: (message: string) => void,
+  json: boolean,
+): (entries: LogEntry[]) => void {
   const seen = new Set<string>();
   return (entries) => {
     for (const entry of entries) {
@@ -123,7 +128,7 @@ function createPrinter(log: (message: string) => void): (entries: LogEntry[]) =>
         const oldest = seen.values().next().value;
         if (oldest !== undefined) seen.delete(oldest);
       }
-      log(`${formatTimestampNs(entry.timestampNs)} ${entry.message}`);
+      log(json ? JSON.stringify(entry) : `${formatTimestampNs(entry.timestampNs)} ${entry.message}`);
     }
   };
 }
