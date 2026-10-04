@@ -43,7 +43,7 @@ flowchart LR
 | `likelion link [--project <id\|name>] [--service <id\|name>]` | 프로젝트·서비스를 골라 현재 폴더에 연결한다 | 구현됨 |
 | `likelion status [--json]` | 연결된 서비스의 최근 배포 상태·단계별 소요 시간·주소를 보여 준다 | 구현됨 |
 | `likelion logs [-f] [--since 1h] [-n 200] [--search <text>] [--target <id\|name>] [--json]` | 런타임 로그를 보여 주고 `-f` 면 새 로그를 계속 따라간다 | 구현됨 |
-| `likelion logs --build\|--deploy\|--network [--deployment <id>] [-f] [--status-class 5xx]` | 배포 하나의 빌드·런타임·네트워크(ALB) 로그를 본다. `--build -f` 는 빌드가 끝날 때까지 따라간다 | 구현됨 ([운영 명령](docs/operations.md)) |
+| `likelion logs --build\|--deploy\|--network [--deployment <id>] [-n N] [-f] [--status-class 5xx]` | 배포 하나의 빌드·런타임·네트워크(ALB) 로그를 본다. `--build -f` 는 빌드가 끝날 때까지 따라가고, `--build -n N` 은 마지막 N줄만 보여 준다 | 구현됨 ([운영 명령](docs/operations.md)) |
 | `likelion open [--target <id\|name>] [--no-browser] [--json]` | 배포된 서비스 주소를 브라우저로 연다 | 구현됨 |
 | `likelion up [--detach] [--logs] [--json]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다. `--logs` 면 빌드 로그도 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 운영 서버에서 `up` 한 번으로 배포 확인 |
 | `likelion deployments [-n 20] [--json]` · `likelion deployments show [id]` | 배포 이력과 배포 하나의 상세(소스·빌드·단계·반영 결과)를 본다 | 구현됨 ([운영 명령](docs/operations.md)) |

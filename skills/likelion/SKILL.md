@@ -27,7 +27,7 @@ Likelion 서비스(GitHub 저장소를 연결한 배포 서비스)를 터미널�
   `--json` 이면 오류도 stderr 에 한 줄 JSON 이다: `{"error":{"code","message","exitCode","retryable","status"?,"details"?}}`. `code` 로 분기한다(예: `DEPLOYMENT_IN_PROGRESS`, `VARIABLE_CONFLICT`).
 - **사용자에게 먼저 물어야 하는 동작**: `fix`(AI 수정을 main 에 머지하고 재배포), `env push`(변수 전체 교체), `rollback`, `restart`. 사용자가 시킨 경우에만 `--yes` 를 붙인다.
 - **비밀을 다루는 법**: `likelion env` 는 값을 숨긴다. 사용자가 값을 달라고 할 때만 `--show-values` 를 쓰고, 값을 대화에 되풀이하거나 커밋하지 않는다. `env pull` 이 만든 `.env` 는 커밋하지 않는다.
-- **출력을 작게 받는다**: `-n`(줄 수)·`--since`·`--search`·`--json | jq` 를 쓴다.
+- **출력을 작게 받는다**: `-n`(줄 수)·`--since`·`--search`·`--json | jq` 를 쓴다. 빌드 로그는 `-n` 을 주지 않으면 전부(최대 10,000줄) 나오니 `logs --build -n 100` 처럼 끝부분만 본다.
 
 ## 시작하기
 
@@ -69,7 +69,7 @@ likelion deployments show 12 --json    # 한 배포의 소스·빌드·단계·�
 
 ```bash
 likelion logs --since 30m -n 100 --json          # 서비스 런타임 로그 (-f 로 따라가기)
-likelion logs --build --deployment 12 --json     # 빌드 로그 (-f 면 빌드가 끝날 때까지)
+likelion logs --build --deployment 12 -n 100 --json   # 빌드 로그의 마지막 100줄 (-n 을 생략하면 전부, -f 면 빌드가 끝날 때까지)
 likelion logs --deploy --deployment 12 --json    # 그 배포의 런타임 로그
 likelion logs --network --status-class 5xx --json
 ```

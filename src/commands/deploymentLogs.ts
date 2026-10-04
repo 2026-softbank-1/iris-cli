@@ -27,6 +27,8 @@ export interface DeploymentLogsOptions {
   follow: boolean;
   /** `deploy`·`network`: 최대 줄 수 (1~1000) */
   limit: number;
+  /** `build` 만: 이만큼의 마지막 줄만 보여 준다(1~1000). 없으면 전부 */
+  tail?: number;
   /** `deploy` 만: 이 문자열이 든 줄만 본다 (대소문자 구분) */
   search?: string;
   /** `deploy`·`network`: 배포 타깃 (타깃이 여러 개일 때) */
@@ -67,6 +69,7 @@ export async function runDeploymentLogs(
         serviceId: link.serviceId,
         deploymentId,
         follow: options.follow,
+        tail: options.tail,
         print: (entry) => emit(formatBuildLogLine(entry), entry),
         warn,
         sleep: deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
@@ -109,7 +112,8 @@ function validate(options: DeploymentLogsOptions): void {
   if (options.follow && options.kind !== "build") {
     throw new UsageError("--follow 는 빌드 로그(--build)에서만 쓸 수 있습니다. 런타임 로그는 `likelion logs -f` 입니다.");
   }
-  if (options.kind !== "build" && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > MAX_LIMIT)) {
+  const count = options.kind === "build" ? options.tail : options.limit;
+  if (count !== undefined && (!Number.isInteger(count) || count < 1 || count > MAX_LIMIT)) {
     throw new UsageError(`--limit 은 1 이상 ${MAX_LIMIT} 이하의 정수여야 합니다.`);
   }
   if (options.search !== undefined && options.kind !== "deploy") {
@@ -142,24 +146,42 @@ interface BuildLogParams {
   serviceId: number;
   deploymentId: number;
   follow: boolean;
+  tail: number | undefined;
   print: (entry: BuildLogEntry) => void;
   warn: (message: string) => void;
   sleep: (ms: number) => Promise<void>;
 }
 
 async function showBuildLogs(params: BuildLogParams): Promise<void> {
-  const { api, token, serviceId, deploymentId, follow, print, warn, sleep } = params;
+  const { api, token, serviceId, deploymentId, follow, tail, print, warn, sleep } = params;
   const reader = new BuildLogReader(api, token, serviceId, deploymentId);
   let lines = 0;
   let loggedDeploymentId: number | undefined;
   let buildStatus: string | undefined;
+  // tail 이면 처음 읽는 로그(이미 쌓인 것)는 모았다가 마지막 N줄만 보이고, 그 뒤 새 로그는 바로 보인다.
+  let isBuffering = tail !== undefined;
+  const backlog: BuildLogEntry[] = [];
   const onEntries = (entries: BuildLogEntry[]) => {
     lines += entries.length;
-    for (const entry of entries) print(entry);
+    if (!isBuffering) {
+      for (const entry of entries) print(entry);
+      return;
+    }
+    backlog.push(...entries);
+    if (tail !== undefined && backlog.length > tail) backlog.splice(0, backlog.length - tail);
+  };
+  const flushBacklog = () => {
+    if (!isBuffering) return;
+    isBuffering = false;
+    for (const entry of backlog) print(entry);
+    if (lines > backlog.length) {
+      warn(`마지막 ${backlog.length}줄만 보여 줬습니다 (전체 ${lines}줄). -n 으로 늘릴 수 있습니다.`);
+    }
   };
 
   for (;;) {
     const page = await reader.drain(onEntries);
+    flushBacklog();
     loggedDeploymentId = page?.loggedDeploymentId ?? loggedDeploymentId;
     buildStatus = page?.buildStatus ?? buildStatus;
     if (page?.isPartial) {
