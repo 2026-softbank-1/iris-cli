@@ -8,7 +8,7 @@ Likelion CLI (`likelion`)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
 ```bash
-npm install -g https://github.com/2026-softbank-1/iris-cli/releases/download/v0.3.1/likelion-0.3.1.tgz
+npm install -g https://github.com/2026-softbank-1/iris-cli/releases/download/v0.4.0/likelion-0.4.0.tgz
 likelion login
 likelion link && likelion up
 ```
@@ -51,15 +51,20 @@ flowchart LR
 | `likelion env [--show-values]` · `env set KEY=VALUE…` · `env unset KEY…` · `env pull [file]` · `env push [file] [--yes]` | 서비스 환경변수를 보고(기본은 값 숨김) 바꾸고 `.env` 로 내려받거나 올린다(`push` 는 전체 교체) | 위와 같음 |
 | `likelion diagnose [id] [--refresh] [--evidence]` | 실패한 배포의 AI 진단(원인·해결책)을 보여 주고, 없으면 시작해 끝날 때까지 기다린다 | 위와 같음 |
 | `likelion fix [id] [--yes]` | 실패한 배포를 AI 가 고치게 한다(핫픽스 PR → main 머지 → 재배포) | 위와 같음 |
+| `likelion services create [--project] [--repo] [--name] [--branch] [--root-dir] [--target] [--link\|--no-link]` | GitHub 저장소를 연결해 서비스를 만들고, 원하면 현재 폴더를 연결한다 | 구현됨 ([계약](docs/onprem-servers-contract.md)) |
+| `likelion servers` | 내 서버(온프레미스) 목록과 연결 상태를 보여 준다 | 구현됨 ([계약](docs/onprem-servers-contract.md)), 운영 서버에서 등록·재발급·삭제 확인 |
+| `likelion servers add <name> [--wait\|--no-wait]` | 서버를 등록하고 서버에서 실행할 설치 명령을 보여 준 뒤 연결될 때까지 기다린다 | 위와 같음 |
+| `likelion servers token <name\|id> [--wait\|--no-wait]` | 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다 | 위와 같음 |
+| `likelion servers remove <name\|id> [--yes]` | 서버를 삭제한다 (`rm` 도 된다) | 위와 같음 |
 | `likelion setup agent [--print\|--global\|--dir <폴더>]` | 에이전트(Claude Code 등)가 이 CLI 를 쓰는 법을 담은 스킬 `SKILL.md` 를 설치한다 | 구현됨 ([에이전트](docs/agents.md)) |
 
 ## 설치
 
-Node.js 20 이상이 필요하다. [Releases](https://github.com/2026-softbank-1/iris-cli/releases) 에 올라온 `likelion-<버전>.tgz` 를 설치한다(최신 v0.3.1). npm 에는 올리지 않는다(이름 `likelion` 을 다른 패키지가 쓰고 있다).
+Node.js 20 이상이 필요하다. [Releases](https://github.com/2026-softbank-1/iris-cli/releases) 에 올라온 `likelion-<버전>.tgz` 를 설치한다(최신 v0.4.0). npm 에는 올리지 않는다(이름 `likelion` 을 다른 패키지가 쓰고 있다).
 
 - 업데이트: 새 버전의 `.tgz` 주소로 위 설치 명령을 다시 실행한다.
 - 삭제: `npm uninstall -g likelion`.
-- 처음 쓰는 순서: `likelion login` → 배포할 폴더에서 `likelion link` → `likelion up`. 서비스는 대시보드에서 GitHub 레포를 연결해 먼저 만들어 둬야 한다.
+- 처음 쓰는 순서: `likelion login` → 배포할 폴더에서 `likelion services create`(또는 대시보드에서 만든 뒤 `likelion link`) → `likelion up`. 서비스는 GitHub 레포를 연결해 만든다.
 
 ## 동작
 
@@ -79,6 +84,39 @@ flowchart LR
 - `.git`·`node_modules`·`.likelion`·`.DS_Store`·`.env`(`.env.example` 은 포함)는 항상 뺀다. 루트의 `.gitignore`·`.likelionignore` 도 따르고, `.likelionignore` 에 `!.env` 처럼 적어 다시 넣을 수 있다. 하위 폴더의 `.gitignore` 는 읽지 않는다.
 - 폴더 밖을 가리키는 심볼릭 링크는 빼고 알려 준다. 압축한 크기 한도는 250 MB 이고(서버 소스 스냅샷 한도와 같다), 넘으면 올리기 전에 멈춘다.
 - 올린 뒤 `CLI` 배포 요청을 만들고 2초마다 상태를 확인해 `SUCCEEDED`·`FAILED` 등으로 끝날 때까지 보여 준다(최대 20분). `--detach` 면 요청만 보내고 끝낸다. 기본은 상태만 보이고 `--logs` 를 주면 빌드 로그도 이어서 보여 준다. 일시적인 서버 오류(5xx)·연결 끊김은 연속 5회까지 2~5초씩 늘려 가며 다시 확인하고, 넘으면 배포 번호와 `likelion status` 안내를 남기고 끝낸다. 4xx 는 다시 시도하지 않는다.
+
+### 서비스 만들기(`services create`)
+
+- 저장소는 `--repo` 로 주고, 없으면 현재 폴더의 git `origin` 을 쓴다(대화형이면 확인을 묻는다). `https://github.com/owner/repo`·`git@github.com:owner/repo.git`·`owner/repo` 를 받는다. GitHub App 이 그 저장소에 설치돼 있어야 한다.
+- 이름은 저장소 이름, 브랜치는 저장소 기본 브랜치, 타깃은 `aws` 가 기본이다. 대화형이면 프로젝트·타깃을 목록에서 고른다(내 서버는 연결 상태를 같이 보여 준다).
+- 만든 뒤 현재 폴더를 연결할지 묻는다. `--link` 면 묻지 않고 연결하고, `--no-link` 나 비대화형이면 연결하지 않고 `link` 명령을 안내한다.
+
+### 내 서버(`servers`)
+
+내 Ubuntu 서버(22.04/24.04, x86_64·arm64)를 배포 대상으로 붙인다. 서버 쪽 동작은 iris-was 의 [온프레미스 서버 등록 계약](https://github.com/2026-softbank-1/iris-was/blob/main/docs/onprem-server-registration-contract.md)을 따른다.
+
+```text
+$ likelion servers add home-lab
+서버를 등록했습니다: home-lab (서버 키 k3x9q2ma)
+
+서버에서 실행하세요 (Ubuntu 22.04/24.04, sudo):
+
+  curl -fsSL https://api.likelion.uk/api/v1/onprem-servers/install.sh | sudo bash -s -- --token <토큰>
+
+이 명령의 토큰은 2026-10-05T03:00:00Z 까지 유효하고 지금 한 번만 보여 줍니다.
+만료되면 `likelion servers token home-lab` 으로 다시 발급하세요.
+
+서버에서 명령을 실행하면 연결을 확인합니다. 기다리는 중... (Ctrl+C 로 멈춰도 등록은 남습니다)
+  대기 (+0s)
+  연결 중 (+96s)
+  연결됨 (+171s)
+서버가 연결되었습니다: home-lab (iris-k3x9q2ma.tailb046e8.ts.net)
+```
+
+- 상태는 대기(`PENDING`) → 연결 중(`REGISTERING`) → 연결됨(`CONNECTED`) / 실패(`FAILED`) 다. 실패하거나 토큰이 만료되거나 연결 중에 멈추면 `servers token` 으로 다시 발급해(상태는 대기로 돌아간다) 서버에서 명령을 다시 실행한다. 서버는 한 사람당 5대까지 등록한다.
+- 등록 토큰은 설치 명령 안에서 한 번만 보인다. 대화형 터미널이면 3초마다 상태를 확인하며 최대 20분 기다리고, 파이프·CI 에서는 명령만 보여 주고 끝낸다. `--wait`·`--no-wait` 로 바꾼다.
+- 삭제는 서비스가 붙어 있지 않은 서버만 된다. 서버에 설치된 K3s·Tailscale 은 지우지 않는다.
+- 연결된 서버에 배포하려면 `likelion services create --target home-lab` 으로 서비스를 만든다. 연결 전 서버도 고를 수 있지만 경고하고, `up` 은 서버가 연결될 때까지 배포하지 않는다.
 
 ### 로그(`logs`)
 
@@ -113,4 +151,5 @@ npm run build              # dist/index.js (실행 파일, shebang 포함)
 - [docs/operations.md](docs/operations.md) — 배포 이력·배포 요청·배포 로그·환경변수·AI 진단/수정 명령
 - [docs/agents.md](docs/agents.md) — LLM 에이전트에서 쓰기: 스킬 설치 · 인증 · `--json` · 종료 코드
 - [docs/login-contract.md](docs/login-contract.md) — `login` 서버 계약
+- [docs/onprem-servers-contract.md](docs/onprem-servers-contract.md) — `servers`·`services create` 서버 계약
 - [docs/up-contract.md](docs/up-contract.md) — `up` 서버 계약

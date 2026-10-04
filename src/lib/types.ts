@@ -110,6 +110,35 @@ export interface ServiceDomain {
 export interface Target {
   id: number;
   name: string;
+  kind?: string;
+  /** 사용자가 등록한 서버의 타깃이면 그 서버 id. 공용 타깃은 없다. */
+  onpremServerId?: number | null;
+  /** 서버 타깃이면 그 서버 이름. 이 필드가 없는 서버는 `GET /onprem-servers` 로 찾는다. */
+  onpremServerName?: string | null;
+  /** 서버 타깃의 연결 상태. 공용 타깃은 없다(항상 배포할 수 있다). */
+  connectionStatus?: OnpremServerStatus | null;
+}
+
+export type OnpremServerStatus = "PENDING" | "REGISTERING" | "CONNECTED" | "FAILED";
+
+export interface OnpremServer {
+  id: number;
+  name: string;
+  serverKey: string;
+  status: OnpremServerStatus;
+  targetId: number;
+  tailnetFqdn?: string | null;
+  failureCode?: string | null;
+  registrationExpiresAt?: string | null;
+  connectedAt?: string | null;
+  createdAt: string;
+}
+
+/** 서버 등록·토큰 재발급 응답. 토큰은 설치 명령에 들어 있고 이 응답에서만 받는다. */
+export interface OnpremServerRegistration {
+  server: OnpremServer;
+  registrationToken: string;
+  installCommand: string;
 }
 
 export interface LogEntry {

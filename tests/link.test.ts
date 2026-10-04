@@ -84,13 +84,14 @@ describe("runLink", () => {
     expect(await findLink(cwd())).toBeNull();
   });
 
-  it("서비스가_하나도_없으면_GitHub_레포를_연결해_만들라고_안내하고_저장하지_않는다", async () => {
+  it("서비스가_하나도_없으면_대시보드나_services_create_로_만들라고_안내하고_저장하지_않는다", async () => {
     await loginAs();
     const { fetchImpl } = fakeFetch([projects(), envelope([])]);
 
-    await expect(runLink({ project: "demo" }, { fetchImpl, cwd: cwd(), log: vi.fn() })).rejects.toThrow(
-      "'demo' 프로젝트에 서비스가 없습니다. 서비스는 대시보드에서 GitHub 레포를 연결해 만들며, 레포가 없으면 만들 수 없습니다.",
-    );
+    const failure = runLink({ project: "demo" }, { fetchImpl, cwd: cwd(), log: vi.fn() });
+
+    await expect(failure).rejects.toThrow("'demo' 프로젝트에 서비스가 없습니다.");
+    await expect(failure).rejects.toThrow("likelion services create --repo");
     expect(await findLink(cwd())).toBeNull();
   });
 

@@ -1,13 +1,16 @@
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
-import type { FetchLike } from "../lib/api.js";
+import type { ApiClient, FetchLike } from "../lib/api.js";
 import { createArchive } from "../lib/archive.js";
 import { createBuildLogFollower } from "../lib/buildLogs.js";
 import { reportResult, waitForDeployment } from "../lib/deployment.js";
+import { ApiError, CliError } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { requireLinkLocation } from "../lib/link.js";
+import { serverStatusLabel } from "../lib/onprem.js";
 import { printJson, progressLog } from "../lib/output.js";
 import { requireSession } from "../lib/session.js";
+import type { OnpremServer, Service, Target } from "../lib/types.js";
 
 interface UploadResult {
   uploadId: string;
@@ -53,6 +56,8 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const { link, dir } = await requireLinkLocation(deps.cwd ?? process.cwd(), credentials);
   const token = credentials.token;
+  // 묶고 올리기 전에 배포할 수 있는 타깃인지 본다. 연결 전 서버는 서버도 배포 요청을 거절한다.
+  await ensureTargetConnected(api, token, link.serviceId);
 
   log(`${link.projectName} / ${link.serviceName} 에 올릴 소스를 묶는 중...`);
   const archive = await createArchive(dir, { maxBytes: deps.maxArchiveBytes });
@@ -72,15 +77,25 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
       },
     });
 
-    const deployment = await api.request<DeploymentRequest>(
-      "POST",
-      `/services/${link.serviceId}/deployments`,
-      {
-        token,
-        body: { triggerType: "CLI", uploadId: upload.uploadId },
-        headers: { "Idempotency-Key": `up-${upload.uploadId}` },
-      },
-    );
+    let deployment: DeploymentRequest;
+    try {
+      deployment = await api.request<DeploymentRequest>(
+        "POST",
+        `/services/${link.serviceId}/deployments`,
+        {
+          token,
+          body: { triggerType: "CLI", uploadId: upload.uploadId },
+          headers: { "Idempotency-Key": `up-${upload.uploadId}` },
+        },
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "TARGET_NOT_CONNECTED") {
+        throw new CliError(
+          "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
+        );
+      }
+      throw error;
+    }
     log(`배포 요청 #${deployment.id} (${deployment.status})`);
     if (options.detach) {
       log("기다리지 않고 끝냅니다. 진행 상황은 `likelion status` 로 확인하세요.");
@@ -105,4 +120,29 @@ export async function runUp(options: UpOptions, deps: UpDeps = {}): Promise<numb
   } finally {
     await archive.cleanup();
   }
+}
+
+async function ensureTargetConnected(api: ApiClient, token: string, serviceId: number): Promise<void> {
+  const [service, targets] = await Promise.all([
+    api.request<Service>("GET", `/services/${serviceId}`, { token }),
+    api.request<Target[]>("GET", "/targets", { token }),
+  ]);
+  const blocked = targets.find(
+    (target) =>
+      service.targetIds.includes(target.id) &&
+      target.connectionStatus != null &&
+      target.connectionStatus !== "CONNECTED",
+  );
+  if (!blocked?.connectionStatus) return;
+
+  const name = blocked.onpremServerName ?? (await findServerName(api, token, blocked)) ?? blocked.name;
+  throw new CliError(
+    `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요. 상태는 \`likelion servers\` 로 확인합니다.`,
+  );
+}
+
+async function findServerName(api: ApiClient, token: string, target: Target): Promise<string | undefined> {
+  if (target.onpremServerId == null) return undefined;
+  const server = await api.request<OnpremServer>("GET", `/onprem-servers/${target.onpremServerId}`, { token });
+  return server.name;
 }

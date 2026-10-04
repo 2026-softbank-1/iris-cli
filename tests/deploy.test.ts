@@ -180,10 +180,10 @@ describe("runDeploy redeploy·rollback·restart", () => {
     expect(t.calls[0]?.body).toEqual({ triggerType: "RESTART" });
   });
 
-  it("타깃_서버가_연결되지_않았으면_연결_상태_확인을_안내한다", async () => {
+  it("타깃_서버가_연결되지_않았으면_servers_를_안내한다", async () => {
     const t = await setup([errorEnvelope(409, "TARGET_NOT_CONNECTED", "x")]);
 
-    await expect(t.run({ kind: "deploy" })).rejects.toThrow("서버가 연결되지 않아");
+    await expect(t.run({ kind: "deploy" })).rejects.toThrow("likelion servers");
   });
 });
 

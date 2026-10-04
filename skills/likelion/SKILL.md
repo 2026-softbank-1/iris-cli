@@ -25,7 +25,7 @@ Likelion 서비스(GitHub 저장소를 연결한 배포 서비스)를 터미널�
   | 5 | 일시적 오류(서버에 닿지 못함·5xx·429) | 그대로 다시 시도한다 |
 
   `--json` 이면 오류도 stderr 에 한 줄 JSON 이다: `{"error":{"code","message","exitCode","retryable","status"?,"details"?}}`. `code` 로 분기한다(예: `DEPLOYMENT_IN_PROGRESS`, `VARIABLE_CONFLICT`).
-- **사용자에게 먼저 물어야 하는 동작**: `fix`(AI 수정을 main 에 머지하고 재배포), `env push`(변수 전체 교체), `rollback`, `restart`. 사용자가 시킨 경우에만 `--yes` 를 붙인다.
+- **사용자에게 먼저 물어야 하는 동작**: `fix`(AI 수정을 main 에 머지하고 재배포), `env push`(변수 전체 교체), `rollback`, `restart`, `servers remove`. 사용자가 시킨 경우에만 `--yes` 를 붙인다.
 - **비밀을 다루는 법**: `likelion env` 는 값을 숨긴다. 사용자가 값을 달라고 할 때만 `--show-values` 를 쓰고, 값을 대화에 되풀이하거나 커밋하지 않는다. `env pull` 이 만든 `.env` 는 커밋하지 않는다.
 - **출력을 작게 받는다**: `-n`(줄 수)·`--since`·`--search`·`--json | jq` 를 쓴다. 빌드 로그는 `-n` 을 주지 않으면 전부(최대 10,000줄) 나오니 `logs --build -n 100` 처럼 끝부분만 본다.
 
@@ -37,7 +37,7 @@ likelion status --json     # 이 폴더에 연결된 서비스와 최근 배포
 ```
 
 - **로그인(exit 3)**: 에이전트는 GitHub 로그인을 승인할 수 없다. 사용자에게 `likelion login` 을 실행해 달라고 하거나, `likelion login --no-browser` 가 출력하는 주소를 사용자에게 전달해 승인하게 한다. CI·원격 환경에서는 사용자가 준 토큰을 환경변수 `LIKELION_TOKEN` 으로 준다(저장된 로그인보다 우선한다).
-- **연결 안 됨**("연결된 서비스가 없습니다"): `likelion link --project <이름|id> --service <이름|id>`. 서비스가 아직 없으면 사용자에게 대시보드에서 GitHub 저장소를 연결해 만들어 달라고 한다(CLI 로는 아직 만들 수 없다).
+- **연결 안 됨**("연결된 서비스가 없습니다"): `likelion link --project <이름|id> --service <이름|id>`. 서비스가 아직 없으면 `likelion services create --repo <GitHub 주소> --link --project <이름|id>`.
 
 ## 자주 하는 일
 
@@ -86,6 +86,16 @@ likelion env pull .env                 # 파일로 내려받기 (권한 0600, �
 likelion env push .env --yes           # 파일 내용으로 전체 교체! 파일에 없는 변수는 삭제된다
 ```
 
+**내 서버(온프레미스)에 배포** — 사용자가 자기 서버를 등록해 배포 대상으로 쓴다.
+
+```bash
+likelion servers --json                                  # 등록한 서버와 연결 상태 (CONNECTED 여야 배포된다)
+likelion servers add <이름> --no-wait                    # 서버에서 실행할 설치 명령을 출력한다 (사용자가 서버에서 sudo 로 실행)
+likelion services create --repo <url> --target <서버 이름> --project <이름|id> --link
+```
+
+서버가 연결되기 전에는 `up`·`deploy` 가 `TARGET_NOT_CONNECTED` 로 거절된다. 등록 토큰은 설치 명령에 한 번만 나오니 사용자에게 그대로 전달하고 다른 곳에 남기지 않는다.
+
 ## 배포가 실패했을 때 (exit 4)
 
 1. `likelion deployments show <id> --json` — `failureCode` 와 `build.status` 로 어느 단계인지 본다.
@@ -102,6 +112,8 @@ likelion env push .env --yes           # 파일 내용으로 전체 교체! 파�
 |---|---|
 | `login [--no-browser]` · `whoami` · `logout` | 인증 |
 | `link [--project --service]` | 폴더를 서비스에 연결 |
+| `services create --repo <url> [--project --name --branch --root-dir --target --link]` | GitHub 저장소로 서비스 만들기 |
+| `servers [add\|token\|remove]` | 내 서버(온프레미스) 등록·관리 |
 | `status` · `open [--target]` | 상태·주소 |
 | `up [--detach --logs]` | 현재 폴더를 올려 배포 |
 | `deploy [--sha]` · `redeploy [id]` · `rollback <id>` · `restart` | 배포 요청 |
@@ -111,4 +123,4 @@ likelion env push .env --yes           # 파일 내용으로 전체 교체! 파�
 | `diagnose [id] [--refresh --evidence]` · `fix [id] --yes` | AI 진단·수정 |
 | `setup agent [--print --global --dir --force]` | 이 스킬 파일을 설치하거나 내용을 출력 |
 
-`--json` 은 `login`·`logout`·`env pull` 을 뺀 명령이 지원한다. 자세한 옵션은 `likelion <명령> --help`.
+`--json` 은 `login`·`logout`·`servers add|token|remove`·`env pull` 을 뺀 명령이 지원한다. 자세한 옵션은 `likelion <명령> --help`.

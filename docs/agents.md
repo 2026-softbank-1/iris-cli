@@ -24,7 +24,7 @@ likelion setup agent --print    # 파일을 쓰지 않고 내용만 출력 (AGEN
 ## 출력
 
 - `--json` 을 지원하는 명령은 서버 응답의 `data` 를 stdout 에 JSON 으로만 낸다. 진행 안내(`up --logs` 의 빌드 로그 포함)는 stderr 다. 로그 명령은 줄마다 JSON 한 줄(JSON Lines)이다.
-- `--json` 이 없는 명령: `login`, `logout`, `env pull`.
+- `--json` 이 없는 명령: `login`, `logout`, `servers add|token|remove`(설치 명령에 등록 토큰이 들어 있다), `env pull`.
 - `--json` 을 주면 사람에게 묻지 않는다. 확인이 필요한 명령은 `--yes` 를 요구한다.
 
 ## 종료 코드
@@ -61,7 +61,7 @@ CLI 의 버그로 보이는 예상 밖 오류는 `code: "INTERNAL"` 이다(텍�
 
 ## 비대화형 규약
 
-다음 중 하나면 CLI 는 절대 질문하지 않는다: 표준 입력이 터미널이 아님, `CI`·`LIKELION_NON_INTERACTIVE`·`CLAUDECODE`·`AI_AGENT`·`AGENT` 환경변수가 설정됨(`0`·`false`·빈 값은 설정하지 않은 것으로 본다), 명령에 `--json`. 그때 `link` 는 `--project`·`--service` 를 요구하고(2), `env push`·`fix` 는 `--yes` 를 요구한다(2).
+다음 중 하나면 CLI 는 절대 질문하지 않는다: 표준 입력이 터미널이 아님, `CI`·`LIKELION_NON_INTERACTIVE`·`CLAUDECODE`·`AI_AGENT`·`AGENT` 환경변수가 설정됨(`0`·`false`·빈 값은 설정하지 않은 것으로 본다), 명령에 `--json`. 그때 `link`·`services create` 는 `--project`·`--service`·`--repo` 를 요구하고(2), `env push`·`fix`·`servers remove` 는 `--yes` 를 요구한다(2).
 
 ## 위험한 동작
 
@@ -69,6 +69,7 @@ CLI 의 버그로 보이는 예상 밖 오류는 `code: "INTERNAL"` 이다(텍�
 
 - `fix --yes`: AI 가 만든 핫픽스를 main 에 머지하고 재배포한다.
 - `env push --yes`: 환경변수 전체를 교체한다.
+- `servers remove --yes`: 서버와 그 배포 타깃을 지운다.
 
 `rollback`·`restart` 는 `--yes` 가 없지만 운영 서비스를 바꾸므로 스킬 파일이 사용자 확인을 안내한다.
 

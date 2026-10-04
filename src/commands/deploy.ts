@@ -143,7 +143,7 @@ function explain(error: unknown, kind: DeployKind): unknown {
     case "TARGET_NOT_CONNECTED":
       return explainApiError(
         error,
-        "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. 대시보드에서 서버 연결 상태를 확인하세요.",
+        "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
       );
     case "DEPLOYMENT_REQUEST_NOT_FOUND":
       return explainApiError(error, "그 번호의 배포를 찾을 수 없습니다. `likelion deployments` 로 번호를 확인하세요.");

@@ -10,6 +10,13 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { type LogsCommandOptions, runLogsCommand } from "./commands/logsCommand.js";
 import { runOpen } from "./commands/open.js";
+import {
+  runServersAdd,
+  runServersList,
+  runServersRemove,
+  runServersToken,
+} from "./commands/servers.js";
+import { runServicesCreate, type ServicesCreateOptions } from "./commands/services.js";
 import { runSetupAgent } from "./commands/setup.js";
 import { runStatus } from "./commands/status.js";
 import { runUp } from "./commands/up.js";
@@ -269,6 +276,64 @@ export function buildProgram(options: ProgramOptions = {}): Command {
       },
     );
 
+  const servers = program.command("servers").description("배포 대상으로 붙인 내 서버(온프레미스)를 관리한다");
+
+  servers
+    .command("list", { isDefault: true })
+    .description("내 서버 목록과 연결 상태를 보여 준다")
+    .option("--json", "JSON 으로 낸다", false)
+    .action(async (options: { json: boolean }) => {
+      await runServersList(options);
+    });
+
+  servers
+    .command("add")
+    .description("서버를 등록하고 서버에서 실행할 설치 명령을 보여 준다")
+    .argument("<name>", "서버 이름 (1~63자)")
+    .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
+    .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
+    .action(async (name: string, options: { wait?: boolean }) => {
+      await withInterrupt((signal) => runServersAdd({ name, wait: options.wait }, { signal }));
+    });
+
+  servers
+    .command("token")
+    .description("등록 토큰을 다시 발급해 새 설치 명령을 보여 준다")
+    .argument("<server>", "서버 이름 또는 id")
+    .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
+    .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
+    .action(async (server: string, options: { wait?: boolean }) => {
+      await withInterrupt((signal) => runServersToken({ server, wait: options.wait }, { signal }));
+    });
+
+  servers
+    .command("remove")
+    .alias("rm")
+    .description("서버를 삭제한다")
+    .argument("<server>", "서버 이름 또는 id")
+    .option("-y, --yes", "묻지 않고 삭제한다", false)
+    .action(async (server: string, options: { yes: boolean }) => {
+      await runServersRemove({ server, yes: options.yes }, { ask: createAsk() });
+    });
+
+  const services = program.command("services").description("서비스를 관리한다");
+
+  services
+    .command("create")
+    .description("GitHub 저장소를 연결해 서비스를 만든다")
+    .option("--project <id|name>", "서비스를 만들 프로젝트 (생략하면 목록에서 고른다)")
+    .option("--repo <url>", "GitHub 저장소 주소 (생략하면 현재 폴더의 git origin)")
+    .option("--name <name>", "서비스 이름 (생략하면 저장소 이름)")
+    .option("--branch <branch>", "배포할 브랜치 (생략하면 저장소 기본 브랜치)")
+    .option("--root-dir <path>", "저장소 안의 서비스 위치 (생략하면 저장소 루트)")
+    .option("--target <name|id>", "배포 타깃: aws 같은 공용 타깃 또는 내 서버 이름 (생략하면 고르거나 aws)")
+    .option("--link", "만든 뒤 묻지 않고 현재 폴더를 연결한다")
+    .option("--no-link", "현재 폴더를 연결하지 않는다")
+    .option("--json", "진행 안내는 stderr 로 보내고 stdout 에는 만든 서비스 JSON 만 낸다 (묻지 않는다)", false)
+    .action(async (options: ServicesCreateOptions) => {
+      await runServicesCreate(options, { ask: askUnlessJson(options.json ?? false) });
+    });
+
   const setup = program.command("setup").description("에이전트 연동 등을 설정한다");
 
   setup
@@ -286,6 +351,18 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     );
 
   return program;
+}
+
+/** Ctrl+C 를 한 번 누르면 signal 로 알려 정리하고 끝내게 한다. 두 번째는 원래대로 바로 끝난다. */
+async function withInterrupt<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const onInterrupt = () => controller.abort();
+  process.once("SIGINT", onInterrupt);
+  try {
+    return await run(controller.signal);
+  } finally {
+    process.off("SIGINT", onInterrupt);
+  }
 }
 
 /** `--json` 이면 사람에게 묻지 않는다(출력이 JSON 한 덩어리여야 하므로). 필요한 값은 옵션으로 받는다. */
