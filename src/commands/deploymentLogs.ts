@@ -85,7 +85,11 @@ export async function runDeploymentLogs(
         emit(`${formatTimestampNs(entry.timestampNs)} ${entry.message}`, entry);
       }
       if (page.entries.length === 0) {
-        warn("이 배포의 런타임 로그가 없습니다. 성공하지 못한 배포이거나 로그가 아직 수집되지 않았습니다.");
+        warn(
+          (await isOnpremDeployment(api, token, base, targetId))
+            ? "이 배포는 내 서버(온프레미스) 타깃에 배포돼 런타임 로그를 아직 수집하지 않습니다."
+            : "이 배포의 런타임 로그가 없습니다. 성공하지 못한 배포이거나 로그가 아직 수집되지 않았습니다.",
+        );
       }
       if (page.isTruncated) warn(`최근 ${options.limit}줄만 보여 줬습니다. --limit 으로 늘릴 수 있습니다.`);
       return;
@@ -99,12 +103,33 @@ export async function runDeploymentLogs(
       for (const entry of page.entries) emit(formatNetworkEntry(entry), entry);
       if (page.entries.length === 0) {
         warn(
-          "이 배포의 네트워크 로그가 없습니다. 성공하지 못한 배포이거나, ALB 가 로그를 올리는 데 몇 분 걸려 아직 없을 수 있습니다.",
+          (await isOnpremDeployment(api, token, base, targetId))
+            ? "이 배포는 내 서버(온프레미스) 타깃에 배포돼 네트워크(ALB) 로그가 없습니다."
+            : "이 배포의 네트워크 로그가 없습니다. 성공하지 못한 배포이거나, ALB 가 로그를 올리는 데 몇 분 걸려 아직 없을 수 있습니다.",
         );
       }
       if (page.isTruncated) warn(`최근 ${options.limit}줄만 보여 줬습니다. --limit 으로 늘릴 수 있습니다.`);
       return;
     }
+  }
+}
+
+/**
+ * 이 배포가 내 서버(온프레미스) 타깃에 배포됐는지. 로그가 비었을 때 이유를 가르는 데만 쓰므로
+ * 조회에 실패하면 모른다고 보고(false) 일반 안내를 한다. `targetId` 를 골랐으면 그 타깃만 본다.
+ */
+async function isOnpremDeployment(
+  api: ApiClient,
+  token: string,
+  deploymentPath: string,
+  targetId: number | undefined,
+): Promise<boolean> {
+  try {
+    const detail = await api.request<DeploymentDetail>("GET", deploymentPath, { token });
+    const targets = detail.configuration?.deploy?.targets ?? [];
+    return targets.some((target) => target.kind === "ONPREM" && (targetId === undefined || target.id === targetId));
+  } catch {
+    return false;
   }
 }
 

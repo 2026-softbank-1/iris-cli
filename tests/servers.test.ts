@@ -472,3 +472,105 @@ describe("runServersList json", () => {
     expect(JSON.parse(t.lines()[0] ?? "")[0]).toMatchObject({ name: "home-lab", status: "CONNECTED" });
   });
 });
+
+describe("servers --json", () => {
+  it("add_는_stdout_에_서버와_설치_명령_JSON_만_내고_안내는_stderr_로_보낸다", async () => {
+    const t = await setup([registration()], { isInteractive: true });
+
+    const result = await runServersAdd({ name: "home-lab", json: true }, t.deps);
+
+    expect(result.name).toBe("home-lab");
+    expect(t.lines()).toHaveLength(1);
+    const printed = JSON.parse(t.lines()[0] ?? "");
+    expect(printed).toMatchObject({ server: { id: 3, name: "home-lab", status: "PENDING" }, installCommand: INSTALL_COMMAND });
+    // 토큰은 설치 명령 안에만 있고 따로 내지 않는다.
+    expect(printed).not.toHaveProperty("registrationToken");
+    expect(t.warn).toHaveBeenCalledWith("서버를 등록했습니다: home-lab (서버 키 k3x9q2ma)");
+    expect(t.warn).not.toHaveBeenCalledWith(expect.stringContaining("reg-fixture"));
+  });
+
+  it("add_는_대화형_터미널이어도_기다리지_않는다", async () => {
+    const t = await setup([registration()], { isInteractive: true });
+
+    await runServersAdd({ name: "home-lab", json: true }, t.deps);
+
+    expect(t.calls).toHaveLength(1);
+    expect(t.sleep).not.toHaveBeenCalled();
+  });
+
+  it("add_에서_json_과_wait_를_함께_주면_서버를_부르기_전에_사용법_오류다", async () => {
+    const t = await setup([registration()]);
+
+    const failure = runServersAdd({ name: "home-lab", json: true, wait: true }, t.deps);
+
+    await expect(failure).rejects.toMatchObject({ exitCode: 2, code: "USAGE" });
+    await expect(failure).rejects.toThrow("--json 은");
+    expect(t.calls).toHaveLength(0);
+  });
+
+  it("add_에서_json_과_no_wait_는_함께_쓸_수_있다", async () => {
+    const t = await setup([registration()]);
+
+    await runServersAdd({ name: "home-lab", json: true, wait: false }, t.deps);
+
+    expect(t.lines()).toHaveLength(1);
+  });
+
+  it("token_은_다시_발급한_서버와_새_설치_명령을_JSON_으로_낸다", async () => {
+    const t = await setup([serverList(server({ status: "FAILED" })), registration()], { isInteractive: true });
+
+    const result = await runServersToken({ server: "home-lab", json: true }, t.deps);
+
+    expect(result.status).toBe("PENDING");
+    expect(t.pathOf(1)).toBe("/api/v1/onprem-servers/3/registration-token");
+    expect(t.lines()).toHaveLength(1);
+    expect(JSON.parse(t.lines()[0] ?? "")).toMatchObject({ server: { name: "home-lab" }, installCommand: INSTALL_COMMAND });
+    expect(t.warn).toHaveBeenCalledWith("새 등록 토큰을 발급했습니다: home-lab. 이전 명령은 더 이상 쓸 수 없습니다.");
+    expect(t.calls).toHaveLength(2);
+  });
+
+  it("token_에서_json_과_wait_를_함께_주면_사용법_오류다", async () => {
+    const t = await setup([serverList()]);
+
+    await expect(runServersToken({ server: "home-lab", json: true, wait: true }, t.deps)).rejects.toMatchObject({
+      exitCode: 2,
+      code: "USAGE",
+    });
+    expect(t.calls).toHaveLength(0);
+  });
+
+  it("remove_는_yes_와_함께_삭제_결과를_JSON_으로_낸다", async () => {
+    const t = await setup([serverList(), noContent()]);
+
+    const isRemoved = await runServersRemove({ server: "home-lab", yes: true, json: true }, t.deps);
+
+    expect(isRemoved).toBe(true);
+    expect(t.lines()).toHaveLength(1);
+    expect(JSON.parse(t.lines()[0] ?? "")).toEqual({
+      removed: true,
+      server: { id: 3, name: "home-lab", serverKey: "k3x9q2ma" },
+    });
+    expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("서버를 삭제했습니다: home-lab."));
+  });
+
+  it("remove_는_json_이어도_yes_가_없으면_삭제하지_않고_yes_를_안내한다", async () => {
+    const t = await setup([serverList()]);
+
+    const failure = runServersRemove({ server: "home-lab", yes: false, json: true }, t.deps);
+
+    await expect(failure).rejects.toMatchObject({ exitCode: 2, code: "USAGE" });
+    await expect(failure).rejects.toThrow("--json 은 삭제를 묻지 않으니 --yes");
+    expect(t.calls).toHaveLength(1);
+    expect(t.log).not.toHaveBeenCalled();
+  });
+
+  it("remove_를_사용_중_서버에_하면_JSON_없이_오류만_낸다", async () => {
+    const t = await setup([serverList(), errorEnvelope(409, "ONPREM_SERVER_IN_USE", "onprem server is in use")]);
+
+    await expect(runServersRemove({ server: "home-lab", yes: true, json: true }, t.deps)).rejects.toMatchObject({
+      code: "ONPREM_SERVER_IN_USE",
+      status: 409,
+    });
+    expect(t.log).not.toHaveBeenCalled();
+  });
+});

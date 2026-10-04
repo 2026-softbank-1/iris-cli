@@ -293,6 +293,7 @@ describe("runUp", () => {
 
     await expect(failure).rejects.toThrow("배포 타깃 서버 home-lab 이 아직 연결되지 않았습니다 (대기)");
     await expect(failure).rejects.toThrow("likelion servers");
+    await expect(failure).rejects.toMatchObject({ code: "TARGET_NOT_CONNECTED", exitCode: 1 });
     expect(new URL(t.allCalls[2]?.url ?? "").pathname).toBe("/api/v1/onprem-servers/3");
     expect(t.calls).toHaveLength(0);
   });
@@ -332,9 +333,12 @@ describe("runUp", () => {
   it("서버가_배포를_TARGET_NOT_CONNECTED_로_거절하면_servers_안내로_끝낸다", async () => {
     const t = await setup([upload(), errorEnvelope(409, "TARGET_NOT_CONNECTED", "target is not connected")]);
 
-    await expect(runUp({ detach: false }, t.deps)).rejects.toThrow(
+    const failure = runUp({ detach: false }, t.deps);
+
+    await expect(failure).rejects.toThrow(
       "배포 타깃 서버가 연결되지 않아 배포할 수 없습니다. `likelion servers` 로 연결 상태를 확인하세요.",
     );
+    await expect(failure).rejects.toMatchObject({ code: "TARGET_NOT_CONNECTED", status: 409, exitCode: 1 });
   });
 
   it("연결되지_않은_폴더면_link_안내", async () => {

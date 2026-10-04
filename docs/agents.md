@@ -24,7 +24,9 @@ likelion setup agent --print    # 파일을 쓰지 않고 내용만 출력 (AGEN
 ## 출력
 
 - `--json` 을 지원하는 명령은 서버 응답의 `data` 를 stdout 에 JSON 으로만 낸다. 진행 안내(`up --logs` 의 빌드 로그 포함)는 stderr 다. 로그 명령은 줄마다 JSON 한 줄(JSON Lines)이다.
-- `--json` 이 없는 명령: `login`, `logout`, `servers add|token|remove`(설치 명령에 등록 토큰이 들어 있다), `env pull`.
+- `--json` 이 없는 명령: `login`, `logout`, `env pull`.
+- `servers add|token --json` 은 stdout 에 `{"server": …, "installCommand": "…"}` 한 덩어리만 내고 연결을 기다리지 않는다(`--wait` 와 함께 주면 2). 서버에서 실행할 명령이 `installCommand` 이고, 일회용 등록 토큰은 그 안에만 있다(따로 내지 않는다). 사용자에게 그대로 전달하고 로그·파일에 남기지 않는다. 연결은 `servers --json` 으로 확인한다.
+- `servers remove --yes --json` 은 `{"removed": true, "server": {"id", "name", "serverKey"}}` 를 낸다. `--yes` 가 없으면 2.
 - `--json` 을 주면 사람에게 묻지 않는다. 확인이 필요한 명령은 `--yes` 를 요구한다.
 
 ## 종료 코드
@@ -50,7 +52,7 @@ HTTP 상태와의 대응은 401 → 3, 429·5xx → 5, 나머지 4xx → 1 이�
 
 | 필드 | 설명 |
 |---|---|
-| `code` | 서버가 준 코드(`VARIABLE_CONFLICT`·`DEPLOYMENT_IN_PROGRESS`·`CONFIGURATION_VALUES_REQUIRED` 등)나 CLI 의 코드: `USAGE`·`UNAUTHENTICATED`·`CONNECTION_FAILED`·`DEPLOYMENT_FAILED`·`DEPLOYMENT_ROLLED_BACK`·`DEPLOYMENT_MANUAL_INTERVENTION`·`DEPLOYMENT_SUPERSEDED`·진단·수정 실패 코드. 코드가 없는 일반 오류는 종료 코드별 기본값(`ERROR`·`FAILED`·`UNAVAILABLE`) |
+| `code` | 서버가 준 코드(`VARIABLE_CONFLICT`·`DEPLOYMENT_IN_PROGRESS`·`CONFIGURATION_VALUES_REQUIRED` 등)나 CLI 의 코드: `USAGE`·`UNAUTHENTICATED`·`CONNECTION_FAILED`·`DEPLOYMENT_FAILED`·`DEPLOYMENT_ROLLED_BACK`·`DEPLOYMENT_MANUAL_INTERVENTION`·`DEPLOYMENT_SUPERSEDED`·`TARGET_NOT_CONNECTED`(배포 타깃 서버가 아직 연결되지 않음)·진단·수정 실패 코드. 코드가 없는 일반 오류는 종료 코드별 기본값(`ERROR`·`FAILED`·`UNAVAILABLE`) |
 | `message` | 사람이 읽을 안내(다음에 할 명령 포함) |
 | `exitCode` | 종료 코드 |
 | `retryable` | 종료 코드가 5 이면 `true` |

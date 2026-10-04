@@ -10,7 +10,7 @@ import {
 } from "../lib/errors.js";
 import { formatTable } from "../lib/format.js";
 import { describeServerNameRejection, printInstallCommand, serverStatusLabel } from "../lib/onprem.js";
-import { printJson } from "../lib/output.js";
+import { printJson, progressLog } from "../lib/output.js";
 import { type Ask, confirm, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
 import type { OnpremServer, OnpremServerRegistration } from "../lib/types.js";
@@ -81,6 +81,8 @@ export interface ServersAddOptions {
   name: string;
   /** 등록한 뒤 연결될 때까지 상태를 따라간다. 없으면 대화형 터미널에서만 기다린다 */
   wait?: boolean;
+  /** stdout 에 `{server, installCommand}` JSON 만 낸다. 연결을 기다리지 않는다 */
+  json?: boolean;
 }
 
 /** 서버를 등록하고 설치 명령을 보여 준 뒤, 기본으로는 연결될 때까지 상태를 따라간다. */
@@ -88,7 +90,9 @@ export async function runServersAdd(
   options: ServersAddOptions,
   deps: ServersDeps = {},
 ): Promise<OnpremServer> {
-  const log = deps.log ?? console.log;
+  const out = deps.log ?? console.log;
+  const log = progressLog(options.json ?? false, out, deps.warn ?? console.error);
+  rejectWaitWithJson(options);
   const name = options.name.trim();
   if (!name) throw new UsageError("서버 이름을 입력해 주세요.");
   const { api, credentials } = await requireSession(deps.fetchImpl);
@@ -122,6 +126,10 @@ export async function runServersAdd(
 
   const { server } = registration;
   log(`서버를 등록했습니다: ${server.name} (서버 키 ${server.serverKey})`);
+  if (options.json) {
+    printInstallJson(registration, out);
+    return server;
+  }
   printInstallCommand(registration, log);
   if (!shouldWait(options.wait, deps)) {
     log("연결 상태는 `likelion servers` 로 확인하세요.");
@@ -135,6 +143,8 @@ export interface ServersTokenOptions {
   server: string;
   /** 연결될 때까지 상태를 따라간다. 없으면 대화형 터미널에서만 기다린다 */
   wait?: boolean;
+  /** stdout 에 `{server, installCommand}` JSON 만 낸다. 연결을 기다리지 않는다 */
+  json?: boolean;
 }
 
 /** 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다. 연결된 서버는 안 되고, 다시 발급하면 상태는 대기로 돌아간다. */
@@ -142,7 +152,9 @@ export async function runServersToken(
   options: ServersTokenOptions,
   deps: ServersDeps = {},
 ): Promise<OnpremServer> {
-  const log = deps.log ?? console.log;
+  const out = deps.log ?? console.log;
+  const log = progressLog(options.json ?? false, out, deps.warn ?? console.error);
+  rejectWaitWithJson(options);
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
   const server = await findServer(api, token, options.server, log);
@@ -166,6 +178,10 @@ export async function runServersToken(
   }
 
   log(`새 등록 토큰을 발급했습니다: ${server.name}. 이전 명령은 더 이상 쓸 수 없습니다.`);
+  if (options.json) {
+    printInstallJson(registration, out);
+    return registration.server;
+  }
   printInstallCommand(registration, log);
   if (!shouldWait(options.wait, deps)) {
     log("연결 상태는 `likelion servers` 로 확인하세요.");
@@ -179,6 +195,8 @@ export interface ServersRemoveOptions {
   server: string;
   /** 묻지 않고 삭제한다 */
   yes: boolean;
+  /** stdout 에 `{removed, server}` JSON 만 낸다. 묻지 않으니 `--yes` 가 필요하다 */
+  json?: boolean;
 }
 
 /** 서버를 삭제한다. 그 서버의 배포 타깃도 함께 사라진다. 지웠으면 true. */
@@ -186,14 +204,19 @@ export async function runServersRemove(
   options: ServersRemoveOptions,
   deps: ServersDeps = {},
 ): Promise<boolean> {
-  const log = deps.log ?? console.log;
+  const out = deps.log ?? console.log;
+  const log = progressLog(options.json ?? false, out, deps.warn ?? console.error);
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
   const server = await findServer(api, token, options.server, log);
 
   if (!options.yes) {
     if (!deps.ask) {
-      throw new UsageError("대화형 터미널이 아니라 삭제를 확인할 수 없습니다. --yes 를 붙여 다시 실행해 주세요.");
+      throw new UsageError(
+        options.json
+          ? "--json 은 삭제를 묻지 않으니 --yes 를 붙여 다시 실행해 주세요."
+          : "대화형 터미널이 아니라 삭제를 확인할 수 없습니다. --yes 를 붙여 다시 실행해 주세요.",
+      );
     }
     const isConfirmed = await confirm(
       deps.ask,
@@ -218,6 +241,9 @@ export async function runServersRemove(
     throw error;
   }
   log(`서버를 삭제했습니다: ${server.name}. 서버에 설치된 K3s·Tailscale 은 지우지 않으니 필요하면 서버에서 직접 지워 주세요.`);
+  if (options.json) {
+    printJson({ removed: true, server: { id: server.id, name: server.name, serverKey: server.serverKey } }, out);
+  }
   return true;
 }
 
@@ -236,6 +262,23 @@ async function findServer(
     log,
     emptyMessage: NO_SERVERS_MESSAGE,
   });
+}
+
+/**
+ * `--json` 은 stdout 에 JSON 한 덩어리만 내야 하는데, 설치 명령은 서버에서 실행해야 연결되므로
+ * 연결을 기다리는 동안엔 그 JSON 을 낼 수 없다. 그래서 `--json` 은 기다리지 않고, `--wait` 와는 함께 못 쓴다.
+ */
+function rejectWaitWithJson(options: { json?: boolean; wait?: boolean }): void {
+  if (options.json && options.wait === true) {
+    throw new UsageError(
+      "--json 은 설치 명령을 JSON 으로 낸 뒤 바로 끝나서 --wait 와 함께 쓸 수 없습니다. 연결은 `likelion servers --json` 으로 확인하세요.",
+    );
+  }
+}
+
+/** 등록 토큰은 설치 명령 안에만 들어 있으니 따로 내지 않는다. */
+function printInstallJson(registration: OnpremServerRegistration, out: (message: string) => void): void {
+  printJson({ server: registration.server, installCommand: registration.installCommand }, out);
 }
 
 function shouldWait(option: boolean | undefined, deps: ServersDeps): boolean {

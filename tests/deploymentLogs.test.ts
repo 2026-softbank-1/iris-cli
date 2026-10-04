@@ -243,6 +243,89 @@ describe("runDeploymentLogs --deploy · --network", () => {
     expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("런타임 로그가 없습니다"));
   });
 
+  describe("로그가_비었을_때_안내", () => {
+    const service = () => envelope({ id: 3, projectId: 1, name: "web", targetIds: [1, 2] });
+    const targetList = () =>
+      envelope([
+        { id: 1, name: "aws" },
+        { id: 2, name: "home-lab" },
+      ]);
+    const deploymentOn = (...targets: { id: number; name: string; kind: string }[]) =>
+      envelope({
+        id: 12,
+        status: "SUCCEEDED",
+        sourceSha: "abc",
+        triggerType: "MANUAL",
+        createdAt: "x",
+        updatedAt: "x",
+        stages: [],
+        configuration: { deploy: { targets } },
+      });
+    const AWS = { id: 1, name: "aws", kind: "AWS" };
+    const HOME_LAB = { id: 2, name: "home-lab", kind: "ONPREM" };
+    const empty = () => envelope({ entries: [], isTruncated: false });
+
+    it("서버_타깃에_배포된_배포의_런타임_로그가_비면_서버_로그는_수집하지_않는다고_알린다", async () => {
+      const t = await setup([empty(), deploymentOn(HOME_LAB)]);
+
+      await t.run({ kind: "deploy" });
+
+      expect(new URL(t.calls[1]?.url ?? "").pathname).toBe("/api/v1/services/3/deployments/12");
+      expect(t.warn).toHaveBeenCalledWith(
+        "이 배포는 내 서버(온프레미스) 타깃에 배포돼 런타임 로그를 아직 수집하지 않습니다.",
+      );
+      expect(t.warn).not.toHaveBeenCalledWith(expect.stringContaining("성공하지 못한 배포"));
+    });
+
+    it("서버_타깃_배포의_네트워크_로그가_비면_ALB_로그가_없다고_알린다", async () => {
+      const t = await setup([empty(), deploymentOn(HOME_LAB)]);
+
+      await t.run({ kind: "network" });
+
+      expect(t.warn).toHaveBeenCalledWith("이 배포는 내 서버(온프레미스) 타깃에 배포돼 네트워크(ALB) 로그가 없습니다.");
+    });
+
+    it("공용_타깃_배포는_기존_안내를_그대로_낸다", async () => {
+      const t = await setup([empty(), deploymentOn(AWS)]);
+
+      await t.run({ kind: "deploy" });
+
+      expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("성공하지 못한 배포이거나 로그가 아직 수집되지 않았습니다"));
+    });
+
+    it("서버_타깃과_공용_타깃을_함께_쓰는_서비스에서_공용_타깃을_골랐으면_기존_안내를_낸다", async () => {
+      const t = await setup([service(), targetList(), empty(), deploymentOn(AWS, HOME_LAB)]);
+
+      await t.run({ kind: "deploy", target: "aws" });
+
+      expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("성공하지 못한 배포"));
+    });
+
+    it("서버_타깃을_골랐으면_그_타깃이_서버일_때만_서버_안내를_낸다", async () => {
+      const t = await setup([service(), targetList(), empty(), deploymentOn(AWS, HOME_LAB)]);
+
+      await t.run({ kind: "deploy", target: "home-lab" });
+
+      expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("내 서버(온프레미스) 타깃"));
+    });
+
+    it("배포_상세를_못_읽어도_로그_조회는_실패하지_않고_기존_안내를_낸다", async () => {
+      const t = await setup([empty(), new Response("Not Found", { status: 404 })]);
+
+      await t.run({ kind: "deploy" });
+
+      expect(t.warn).toHaveBeenCalledWith(expect.stringContaining("런타임 로그가 없습니다"));
+    });
+
+    it("로그가_있으면_배포_상세를_조회하지_않는다", async () => {
+      const t = await setup([envelope({ entries: [logEntry(T1, "hi")], isTruncated: false })]);
+
+      await t.run({ kind: "deploy" });
+
+      expect(t.calls).toHaveLength(1);
+    });
+  });
+
   it("network_는_응답_코드와_바이트와_응답_시간을_한_줄로_보여_준다", async () => {
     const t = await setup([
       envelope({

@@ -292,8 +292,9 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .argument("<name>", "서버 이름 (1~63자, 영문·숫자·한글·.·_·-, 공백·숫자만 불가)")
     .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
     .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
-    .action(async (name: string, options: { wait?: boolean }) => {
-      await withInterrupt((signal) => runServersAdd({ name, wait: options.wait }, { signal }));
+    .option("--json", "stdout 에 서버와 설치 명령 JSON 만 낸다 (기다리지 않는다)", false)
+    .action(async (name: string, options: { wait?: boolean; json: boolean }) => {
+      await withInterrupt((signal) => runServersAdd({ name, wait: options.wait, json: options.json }, { signal }));
     });
 
   servers
@@ -302,8 +303,11 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .argument("<server>", "서버 이름 또는 id")
     .option("--wait", "연결될 때까지 기다린다 (대화형 터미널의 기본)")
     .option("--no-wait", "설치 명령만 보여 주고 연결될 때까지 기다리지 않는다")
-    .action(async (server: string, options: { wait?: boolean }) => {
-      await withInterrupt((signal) => runServersToken({ server, wait: options.wait }, { signal }));
+    .option("--json", "stdout 에 서버와 설치 명령 JSON 만 낸다 (기다리지 않는다)", false)
+    .action(async (server: string, options: { wait?: boolean; json: boolean }) => {
+      await withInterrupt((signal) =>
+        runServersToken({ server, wait: options.wait, json: options.json }, { signal }),
+      );
     });
 
   servers
@@ -312,8 +316,12 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .description("서버를 삭제한다")
     .argument("<server>", "서버 이름 또는 id")
     .option("-y, --yes", "묻지 않고 삭제한다", false)
-    .action(async (server: string, options: { yes: boolean }) => {
-      await runServersRemove({ server, yes: options.yes }, { ask: createAsk() });
+    .option("--json", "stdout 에 삭제 결과 JSON 만 낸다 (묻지 않으니 --yes 가 필요하다)", false)
+    .action(async (server: string, options: { yes: boolean; json: boolean }) => {
+      await runServersRemove(
+        { server, yes: options.yes, json: options.json },
+        { ask: askUnlessJson(options.json) },
+      );
     });
 
   const services = program.command("services").description("서비스를 관리한다");
