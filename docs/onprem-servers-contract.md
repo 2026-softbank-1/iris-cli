@@ -25,10 +25,11 @@ CLI                                          Control API                사용�
 | `id` | `token`·`remove`·상태 확인 경로 |
 | `name` | 목록·`<이름\|id>` 로 찾기 (`matchByIdOrName`) |
 | `serverKey` | 목록·삭제 확인 문구 |
-| `status` | `PENDING`(대기)·`REGISTERING`(연결 중)·`CONNECTED`(연결됨)·`FAILED`(실패). 모르는 값은 그대로 보여 준다 |
+| `status` | `PENDING`(대기)·`REGISTERING`(연결 중)·`CONNECTED`(연결됨)·`DISCONNECTED`(연결 끊김)·`FAILED`(실패). 모르는 값은 그대로 보여 준다. `DISCONNECTED` 는 연결됐던 서버의 신호(하트비트)가 한동안 없을 때 서버가 계산해 주는 값이고, 신호가 다시 오면 저절로 `CONNECTED` 로 돌아온다 |
 | `failureCode` | `FAILED` 일 때 상태 옆에 붙인다 (`CONNECT_TIMED_OUT`·`GITOPS_COMMIT_FAILED`) |
 | `tailnetFqdn` | 목록·연결 완료 문구 |
 | `connectedAt` | 목록 |
+| `lastSeenAt` | `DISCONNECTED` 일 때 목록의 상태 옆에 "마지막 신호 …" 로 붙인다 (서버가 1분마다 갱신) |
 | `registrationExpiresAt` | 설치 명령 아래 만료 안내. `PENDING` 인 채로 이 시각이 지나면 기다리기를 멈추고 재발급을 안내한다 |
 | `targetId`, `createdAt` | 타입에만 둔다 |
 
@@ -39,7 +40,7 @@ CLI                                          Control API                사용�
 | `servers` (`list`) | `GET /onprem-servers` | 표로 보여 준다. 빈 목록이면 `servers add` 를 안내한다 |
 | `servers add <name>` | `POST /onprem-servers` `{name}` → 201 `{server, registrationToken, installCommand}` | `installCommand` 만 보여 준다(토큰을 따로 찍지 않는다). 409 `ONPREM_SERVER_NAME_CONFLICT` → 같은 이름 안내, 409 `ONPREM_SERVER_LIMIT_EXCEEDED` → 한 사람당 5대 한도 안내(다른 409 는 서버 메시지를 붙여 안내), 422 → 이름 규칙 안내(서버가 `details[].reason` 으로 준 사유를 풀어 알린다: 빈 이름·63자 초과·숫자만·시작 글자·허용 문자), 503 `NOT_CONFIGURED` → 서버 등록이 아직 준비되지 않았다고 안내 |
 | `servers add`·`token` 의 기다리기 | `GET /onprem-servers/{id}` | 3초마다. 상태가 바뀔 때만 찍는다. `CONNECTED` 면 성공, `FAILED` 면 `failureCode` 와 `servers token` 안내로 실패. 5xx·연결 끊김은 연속 5회까지 다시 확인하고, 4xx 는 바로 끝낸다. Ctrl+C 나 20분이 지나면 등록은 남는다고 알리고 끝낸다. 대화형 터미널이 아니면 기본으로 부르지 않는다(`--wait`·`--no-wait` 로 바꾼다) |
-| `servers token <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `POST /onprem-servers/{id}/registration-token` → `{server, registrationToken, installCommand}` | 대기·연결 중·실패 상태에서 되고 상태는 대기로 돌아간다. 409 `INVALID_STATUS_TRANSITION`(연결됨) → 상태와 함께 안내, 503 `NOT_CONFIGURED` → 준비 중 안내 |
+| `servers token <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `POST /onprem-servers/{id}/registration-token` → `{server, registrationToken, installCommand}` | 대기·연결 중·실패 상태에서 되고 상태는 대기로 돌아간다. 409 `INVALID_STATUS_TRANSITION`(연결됨) → 상태와 함께 안내(연결 끊김이면 재발급 대신 신호가 돌아오길 기다리라고 안내), 503 `NOT_CONFIGURED` → 준비 중 안내 |
 | `servers remove <이름\|id>` | `GET /onprem-servers` 로 찾은 뒤 `DELETE /onprem-servers/{id}` → 204 | 확인을 묻는다(`--yes` 면 생략, 비대화형이면 `--yes` 필수). 409 `ONPREM_SERVER_IN_USE` → 서비스를 먼저 지우라고 안내 |
 | `services create` | `GET /projects` · `GET /targets` · (서버 타깃이 있으면) `GET /onprem-servers` · `POST /projects/{projectId}/services` | 아래 참고 |
 | `up` | `GET /services/{id}` · `GET /targets` · (연결 전이고 `onpremServerName` 이 없으면) `GET /onprem-servers/{id}` | 아래 참고 |
@@ -71,7 +72,7 @@ CLI                                          Control API                사용�
 
 ### `up` 의 타깃 확인
 
-묶고 올리기 전에 서비스의 타깃 중 `connectionStatus` 가 있고 `CONNECTED` 가 아닌 것이 있으면 서버 이름과 상태를 알리고 멈춘다. 그래도 서버가 배포 요청(`POST /services/{id}/deployments`)을 409 `TARGET_NOT_CONNECTED` 로 거절하면 같은 뜻의 메시지로 끝낸다.
+묶고 올리기 전에 서비스의 타깃 중 `connectionStatus` 가 있고 `CONNECTED` 가 아닌 것이 있으면 서버 이름과 상태를 알리고 멈춘다(`DISCONNECTED` 는 "아직 연결되지 않았다"가 아니라 "연결이 끊겨 있다"로 알린다). 그래도 서버가 배포 요청(`POST /services/{id}/deployments`)을 409 `TARGET_NOT_CONNECTED` 로 거절하면 같은 뜻의 메시지로 끝낸다.
 
 ## 확인된 점
 

@@ -7,7 +7,7 @@ import { reportResult, waitForDeployment } from "../lib/deployment.js";
 import { ApiError, CliError, EXIT, explainApiError } from "../lib/errors.js";
 import { formatBytes } from "../lib/format.js";
 import { requireLinkLocation } from "../lib/link.js";
-import { serverStatusLabel } from "../lib/onprem.js";
+import { DISCONNECTED_HINT, serverStatusLabel } from "../lib/onprem.js";
 import { printJson, progressLog } from "../lib/output.js";
 import { requireSession } from "../lib/session.js";
 import type { OnpremServer, Service, Target } from "../lib/types.js";
@@ -137,8 +137,12 @@ async function ensureTargetConnected(api: ApiClient, token: string, serviceId: n
   if (!blocked?.connectionStatus) return;
 
   const name = blocked.onpremServerName ?? (await findServerName(api, token, blocked)) ?? blocked.name;
+  const reason =
+    blocked.connectionStatus === "DISCONNECTED"
+      ? `배포 타깃 서버 ${name} 의 연결이 끊겨 있습니다. ${DISCONNECTED_HINT} 연결된 뒤 다시 실행하세요.`
+      : `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요.`;
   throw new CliError(
-    `배포 타깃 서버 ${name} 이 아직 연결되지 않았습니다 (${serverStatusLabel(blocked.connectionStatus)}). 연결된 뒤 다시 실행하세요. 상태는 \`likelion servers\` 로 확인합니다.`,
+    `${reason} 상태는 \`likelion servers\` 로 확인합니다.`,
     EXIT.FAILURE,
     "TARGET_NOT_CONNECTED",
   );

@@ -9,7 +9,12 @@ import {
   UsageError,
 } from "../lib/errors.js";
 import { formatTable } from "../lib/format.js";
-import { describeServerNameRejection, printInstallCommand, serverStatusLabel } from "../lib/onprem.js";
+import {
+  DISCONNECTED_HINT,
+  describeServerNameRejection,
+  printInstallCommand,
+  serverStatusLabel,
+} from "../lib/onprem.js";
 import { printJson, progressLog } from "../lib/output.js";
 import { type Ask, confirm, pickOne } from "../lib/prompt.js";
 import { requireSession } from "../lib/session.js";
@@ -168,6 +173,12 @@ export async function runServersToken(
     );
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
+      if (server.status === "DISCONNECTED") {
+        throw explainApiError(
+          error,
+          `${server.name} 은 연결이 끊긴 상태라 토큰을 다시 발급할 수 없습니다. 연결됐던 서버는 재발급 없이 되돌아옵니다. ${DISCONNECTED_HINT}`,
+        );
+      }
       throw explainApiError(
         error,
         `${server.name} 은 지금 ${serverStatusLabel(server.status)} 상태라 토큰을 다시 발급할 수 없습니다. 대기·연결 중·실패 상태에서만 다시 발급합니다.`,
@@ -287,6 +298,7 @@ function shouldWait(option: boolean | undefined, deps: ServersDeps): boolean {
 
 function describeStatus(server: OnpremServer): string {
   const label = serverStatusLabel(server.status);
+  if (server.status === "DISCONNECTED" && server.lastSeenAt) return `${label} (마지막 신호 ${server.lastSeenAt})`;
   return server.failureCode ? `${label} (${server.failureCode})` : label;
 }
 

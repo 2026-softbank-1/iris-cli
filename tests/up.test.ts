@@ -298,6 +298,23 @@ describe("runUp", () => {
     expect(t.calls).toHaveLength(0);
   });
 
+  it("타깃_서버의_연결이_끊겼으면_끊겼다고_알리고_올리지_않는다", async () => {
+    const dropped = () =>
+      envelope([
+        { id: 7, name: "onprem-k3x9q2ma", kind: "ONPREM", onpremServerId: 3, onpremServerName: "home-lab", connectionStatus: "DISCONNECTED" },
+      ]);
+    const t = await setup([], [serviceInfo([7]), dropped()]);
+
+    const failure = runUp({ detach: false }, t.deps);
+
+    await expect(failure).rejects.toThrow("배포 타깃 서버 home-lab 의 연결이 끊겨 있습니다.");
+    await expect(failure).rejects.toThrow("서버가 신호를 다시 보내면 저절로 연결됩니다.");
+    await expect(failure).rejects.toThrow("likelion servers");
+    await expect(failure).rejects.not.toThrow("아직 연결되지 않았습니다");
+    await expect(failure).rejects.toMatchObject({ code: "TARGET_NOT_CONNECTED", exitCode: 1 });
+    expect(t.calls).toHaveLength(0);
+  });
+
   it("타깃에_서버_이름이_있으면_서버를_다시_조회하지_않는다", async () => {
     const named = () =>
       envelope([
