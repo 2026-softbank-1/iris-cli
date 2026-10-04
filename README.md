@@ -41,16 +41,17 @@ flowchart LR
 | `likelion whoami [--json]` | 로그인한 GitHub 계정을 보여 준다 | 구현됨 |
 | `likelion logout` | 저장된 로그인 정보를 지운다 | 구현됨 |
 | `likelion link [--project <id\|name>] [--service <id\|name>]` | 프로젝트·서비스를 골라 현재 폴더에 연결한다 | 구현됨 |
-| `likelion status` | 연결된 서비스의 최근 배포 상태·단계별 소요 시간·주소를 보여 준다 | 구현됨 |
+| `likelion status [--json]` | 연결된 서비스의 최근 배포 상태·단계별 소요 시간·주소를 보여 준다 | 구현됨 |
 | `likelion logs [-f] [--since 1h] [-n 200] [--search <text>] [--target <id\|name>] [--json]` | 런타임 로그를 보여 주고 `-f` 면 새 로그를 계속 따라간다 | 구현됨 |
 | `likelion logs --build\|--deploy\|--network [--deployment <id>] [-f] [--status-class 5xx]` | 배포 하나의 빌드·런타임·네트워크(ALB) 로그를 본다. `--build -f` 는 빌드가 끝날 때까지 따라간다 | 구현됨 ([운영 명령](docs/operations.md)) |
-| `likelion open [--target <id\|name>] [--no-browser]` | 배포된 서비스 주소를 브라우저로 연다 | 구현됨 |
+| `likelion open [--target <id\|name>] [--no-browser] [--json]` | 배포된 서비스 주소를 브라우저로 연다 | 구현됨 |
 | `likelion up [--detach] [--logs] [--json]` | 연결된 폴더를 tar.gz 로 묶어 올려 배포하고, 끝날 때까지 상태를 보여 준다. `--logs` 면 빌드 로그도 보여 준다 | 구현됨 ([계약](docs/up-contract.md)), 운영 서버에서 `up` 한 번으로 배포 확인 |
 | `likelion deployments [-n 20] [--json]` · `likelion deployments show [id]` | 배포 이력과 배포 하나의 상세(소스·빌드·단계·반영 결과)를 본다 | 구현됨 ([운영 명령](docs/operations.md)) |
 | `likelion deploy [--sha <commit>]` · `redeploy [id]` · `rollback <id>` · `restart` (`--detach` `--logs` `--json`) | 대시보드의 Deploy·Redeploy·Rollback·Restart 와 같은 배포 요청을 만들고 끝날 때까지 기다린다 | 위와 같음 |
 | `likelion env [--show-values]` · `env set KEY=VALUE…` · `env unset KEY…` · `env pull [file]` · `env push [file] [--yes]` | 서비스 환경변수를 보고(기본은 값 숨김) 바꾸고 `.env` 로 내려받거나 올린다(`push` 는 전체 교체) | 위와 같음 |
 | `likelion diagnose [id] [--refresh] [--evidence]` | 실패한 배포의 AI 진단(원인·해결책)을 보여 주고, 없으면 시작해 끝날 때까지 기다린다 | 위와 같음 |
 | `likelion fix [id] [--yes]` | 실패한 배포를 AI 가 고치게 한다(핫픽스 PR → main 머지 → 재배포) | 위와 같음 |
+| `likelion setup agent [--print\|--global\|--dir <폴더>]` | 에이전트(Claude Code 등)가 이 CLI 를 쓰는 법을 담은 스킬 `SKILL.md` 를 설치한다 | 구현됨 ([에이전트](docs/agents.md)) |
 
 ## 설치
 
@@ -90,6 +91,10 @@ flowchart LR
 - `LIKELION_TOKEN`: 저장된 로그인 대신 쓸 토큰(CI·에이전트). 서버 주소는 `LIKELION_API_URL` 이나 기본값이다.
 - `LIKELION_NON_INTERACTIVE=1`: 터미널에서도 질문하지 않는다. `CI`·`CLAUDECODE`·`AI_AGENT`·`AGENT` 가 설정돼 있어도 같다. 확인이 필요한 명령은 `--yes` 를 요구한다.
 
+## 에이전트에서 쓰기
+
+LLM 에이전트가 쓰기 쉽게 `--json`(stdout 에 JSON 만, 진행 안내·오류는 stderr), 구분된 종료 코드(0 성공 · 1 실패 · 2 사용법 · 3 인증 · 4 결과 실패 · 5 일시적 오류), 질문 없는 실행, 스킬 파일을 갖췄다. `likelion setup agent` 로 스킬을 설치한다. 규약은 [docs/agents.md](docs/agents.md) 에 있다.
+
 ## 개발
 
 Node.js 20 이상, TypeScript · commander · tsup · vitest 를 쓴다. CI(`.github/workflows/ci.yml`)는 PR·`main` push 마다 typecheck·test·build 를 돌리고 배포는 하지 않는다.
@@ -106,5 +111,6 @@ npm run build              # dist/index.js (실행 파일, shebang 포함)
 
 - [docs/development.md](docs/development.md) — 사용하는 API 표 · 릴리스 절차 · 코드 규칙
 - [docs/operations.md](docs/operations.md) — 배포 이력·배포 요청·배포 로그·환경변수·AI 진단/수정 명령
+- [docs/agents.md](docs/agents.md) — LLM 에이전트에서 쓰기: 스킬 설치 · 인증 · `--json` · 종료 코드
 - [docs/login-contract.md](docs/login-contract.md) — `login` 서버 계약
 - [docs/up-contract.md](docs/up-contract.md) — `up` 서버 계약

@@ -1,8 +1,14 @@
 import type { FetchLike } from "../lib/api.js";
-import { formatSeconds, shortSha } from "../lib/format.js";
+import { describeStage } from "../lib/deployment.js";
+import { shortSha } from "../lib/format.js";
 import { requireLink } from "../lib/link.js";
+import { printJson } from "../lib/output.js";
 import { requireSession } from "../lib/session.js";
-import type { DeploymentDetail, DeploymentStage, Service, ServiceDomain } from "../lib/types.js";
+import type { DeploymentDetail, Service, ServiceDomain } from "../lib/types.js";
+
+export interface StatusOptions {
+  json?: boolean;
+}
 
 export interface StatusDeps {
   fetchImpl?: FetchLike;
@@ -11,7 +17,7 @@ export interface StatusDeps {
 }
 
 /** 연결된 서비스의 최근 배포 상태·단계별 소요 시간·접속 주소를 보여 준다. */
-export async function runStatus(deps: StatusDeps = {}): Promise<void> {
+export async function runStatus(options: StatusOptions = {}, deps: StatusDeps = {}): Promise<void> {
   const log = deps.log ?? console.log;
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const link = await requireLink(deps.cwd ?? process.cwd(), credentials);
@@ -22,14 +28,20 @@ export async function runStatus(deps: StatusDeps = {}): Promise<void> {
     api.request<ServiceDomain[]>("GET", `/services/${link.serviceId}/domains`, { token }),
   ]);
 
-  log(`${service.name} (서비스 ${service.id}, 프로젝트 ${link.projectName})`);
   const latest = service.latestDeployment;
-  if (latest) {
-    const detail = await api.request<DeploymentDetail>(
-      "GET",
-      `/services/${service.id}/deployments/${latest.id}`,
-      { token },
-    );
+  const detail = latest
+    ? await api.request<DeploymentDetail>("GET", `/services/${service.id}/deployments/${latest.id}`, {
+        token,
+      })
+    : undefined;
+
+  if (options.json) {
+    printJson({ service, deployment: detail ?? null, domains }, log);
+    return;
+  }
+
+  log(`${service.name} (서비스 ${service.id}, 프로젝트 ${link.projectName})`);
+  if (detail) {
     log(`상태  ${detail.status}`);
     if (detail.failureCode) log(`사유  ${detail.failureCode}`);
     const message = detail.sourceCommitMessage ? `  ${detail.sourceCommitMessage}` : "";
@@ -43,20 +55,4 @@ export async function runStatus(deps: StatusDeps = {}): Promise<void> {
   for (const domain of domains) {
     if (domain.isConnected && domain.url) log(`주소  ${domain.url} (${domain.targetName})`);
   }
-}
-
-// 끝난 상태의 단계에는 종료 시각이 없어 소요 시간도 없다. 진행 중으로 읽히지 않게 상태만 보여 준다.
-const TERMINAL_STATUSES = new Set([
-  "SUCCEEDED",
-  "FAILED",
-  "ROLLED_BACK",
-  "MANUAL_INTERVENTION",
-  "SUPERSEDED",
-]);
-
-function describeStage(stage: DeploymentStage): string {
-  if (stage.durationSeconds !== undefined) {
-    return `${stage.status} ${formatSeconds(stage.durationSeconds)}`;
-  }
-  return TERMINAL_STATUSES.has(stage.status) ? stage.status : `${stage.status} 진행 중`;
 }

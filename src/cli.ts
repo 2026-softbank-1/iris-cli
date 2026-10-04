@@ -11,6 +11,7 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
+import { runSetupAgent } from "./commands/setup.js";
 import { runStatus } from "./commands/status.js";
 import { runUp } from "./commands/up.js";
 import { runWhoami } from "./commands/whoami.js";
@@ -31,6 +32,18 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .version(pkg.version, "-v, --version")
     .exitOverride();
   if (options.quietParseErrors) program.configureOutput({ writeErr: () => {} });
+  program.addHelpText(
+    "after",
+    [
+      "",
+      "에이전트(LLM)에서 쓰기:",
+      "  likelion setup agent     Claude Code 등이 읽는 스킬(SKILL.md)을 설치한다",
+      "  --json                   stdout 에 JSON 만 낸다 (진행 안내·오류는 stderr)",
+      "  LIKELION_TOKEN           저장된 로그인 대신 쓸 토큰 (CI·원격 환경)",
+      "  종료 코드                0 성공 · 1 실패 · 2 사용법 · 3 인증 · 4 결과 실패(배포 실패 등) · 5 일시적 오류",
+    ].join("\n"),
+  );
+
   program
     .command("login")
     .description("GitHub 계정으로 로그인한다")
@@ -60,15 +73,17 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .description("현재 폴더를 서비스에 연결한다")
     .option("--project <id|name>", "연결할 프로젝트 (생략하면 목록에서 고른다)")
     .option("--service <id|name>", "연결할 서비스 (생략하면 목록에서 고른다)")
-    .action(async (options: { project?: string; service?: string }) => {
-      await runLink(options, { ask: createAsk() });
+    .option("--json", "진행 안내는 stderr 로 보내고 stdout 에는 연결 정보 JSON 만 낸다 (묻지 않는다)", false)
+    .action(async (options: { project?: string; service?: string; json: boolean }) => {
+      await runLink(options, { ask: askUnlessJson(options.json) });
     });
 
   program
     .command("status")
     .description("연결된 서비스의 최근 배포 상태를 보여 준다")
-    .action(async () => {
-      await runStatus();
+    .option("--json", "JSON 으로 낸다", false)
+    .action(async (options: { json: boolean }) => {
+      await runStatus(options);
     });
 
   program
@@ -137,7 +152,8 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .description("배포된 서비스 주소를 브라우저로 연다")
     .option("--target <id|name>", "배포 타깃 (타깃이 여러 개일 때)")
     .option("--no-browser", "브라우저를 열지 않고 주소만 출력한다")
-    .action(async (options: { target?: string; browser: boolean }) => {
+    .option("--json", "브라우저를 열지 않고 주소 목록을 JSON 으로 낸다", false)
+    .action(async (options: { target?: string; browser: boolean; json: boolean }) => {
       await runOpen(options);
     });
 
@@ -295,6 +311,22 @@ export function buildProgram(options: ProgramOptions = {}): Command {
         options: { yes: boolean; detach: boolean; json: boolean },
       ) => {
         await runFix({ deployment, ...options }, { ask: askUnlessJson(options.json) });
+      },
+    );
+
+  const setup = program.command("setup").description("에이전트 연동 등을 설정한다");
+
+  setup
+    .command("agent")
+    .description("에이전트(Claude Code 등)가 이 CLI 를 쓰는 법을 담은 스킬(SKILL.md)을 설치한다")
+    .option("--print", "파일을 쓰지 않고 내용을 stdout 으로 낸다", false)
+    .option("--global", "~/.claude/skills 에 설치한다 (기본: 현재 폴더의 .claude/skills)", false)
+    .option("--dir <path>", "스킬 폴더를 직접 지정한다 (예: .agents/skills)")
+    .option("--force", "내용이 다른 파일을 최신 내용으로 덮어쓴다", false)
+    .option("--json", "결과를 JSON 으로 낸다", false)
+    .action(
+      async (options: { print: boolean; global: boolean; dir?: string; force: boolean; json: boolean }) => {
+        await runSetupAgent(options);
       },
     );
 

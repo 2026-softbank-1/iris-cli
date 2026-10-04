@@ -31,5 +31,7 @@ GitHub Actions 로 자동화하지 않았다. 버전을 올릴 때 손으로 한
 ## 규칙
 
 - 서버 응답은 `ApiResponse` 봉투(`success`·`code`·`message`·`data`)이고 JSON 키는 camelCase 다. 봉투는 `src/lib/api.ts` 한 곳에서 벗긴다.
-- 사용자에게 보일 오류는 `CliError` 로 던진다. `src/index.ts` 가 메시지 한 줄과 종료 코드로 끝낸다.
+- 사용자에게 보일 오류는 `CliError` 로 던진다. 종류에 따라 `UsageError`(2)·`AuthError`(3)·`ResultError`(4)를 쓰고 서버 오류(`ApiError`)는 HTTP 상태로 1·3·5 가 정해진다. `src/index.ts` 가 `src/lib/report.ts` 로 메시지(또는 `--json` 이면 오류 JSON 한 줄)와 종료 코드를 내고 끝낸다. 종료 코드 표는 [agents.md](agents.md#종료-코드).
+- `--json` 이 있는 명령은 서버 응답의 `data` 만 stdout 에 내고 진행 안내는 stderr 로 보낸다(`src/lib/output.ts`).
+- 명령을 추가·변경하면 `skills/likelion/SKILL.md` 도 같이 고친다(테스트가 명령·옵션과의 일치를 검사한다).
 - 커밋 메시지는 Conventional Commits(`feat: 설명`), 한글, 명령형으로 쓴다.

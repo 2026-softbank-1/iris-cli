@@ -65,4 +65,21 @@ describe("runOpen", () => {
     );
     expect(t.openBrowser).not.toHaveBeenCalled();
   });
+
+  it("json_이면_브라우저를_열지_않고_주소_목록을_JSON_으로_낸다", async () => {
+    const t = await setup([aws, local]);
+
+    await runOpen({ browser: true, json: true }, { ...t, cwd: cwd() });
+
+    expect(t.openBrowser).not.toHaveBeenCalled();
+    expect(t.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(t.log.mock.calls[0]?.[0] as string)).toEqual({
+      url: "https://web-3.likelion.uk",
+      target: "aws",
+      targets: [
+        { id: 1, name: "aws", url: "https://web-3.likelion.uk" },
+        { id: 2, name: "local", url: "https://web-3.local.test" },
+      ],
+    });
+  });
 });

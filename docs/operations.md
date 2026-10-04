@@ -5,7 +5,7 @@
 ## 출력 규칙
 
 - `--json` 이 있는 명령은 서버 응답의 `data` 를 봉투 없이 그대로 stdout 에 낸다(키는 camelCase). 사람용 진행 안내는 stderr 로 보내서 `| jq` 로 바로 읽을 수 있다. 로그 명령은 줄마다 JSON 한 줄(JSON Lines)이다.
-- 실패는 메시지를 stderr 로 내고 종료 코드로 끝낸다. 배포가 `FAILED`·`ROLLED_BACK` 으로 끝나는 것은 종료 코드 `4` 다. `--json` 이면 오류도 stderr 에 `{"error":{…}}` 한 줄이다.
+- 실패는 메시지를 stderr 로 내고 [종료 코드](agents.md#종료-코드)로 끝낸다. 배포가 `FAILED`·`ROLLED_BACK` 으로 끝나는 것은 종료 코드 `4` 다. `--json` 이면 오류도 stderr 에 `{"error":{…}}` 한 줄이다.
 - 값이 비밀일 수 있는 출력(환경변수)은 기본으로 숨긴다.
 
 ## 배포 이력·상세
