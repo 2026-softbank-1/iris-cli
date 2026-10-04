@@ -251,6 +251,23 @@ describe("runServersAdd", () => {
     );
   });
 
+  it("안내문으로_바꿔도_서버_오류_코드와_상태를_지킨다", async () => {
+    const t = await setup([errorEnvelope(409, "ONPREM_SERVER_NAME_CONFLICT", "onprem server name already exists")]);
+
+    await expect(runServersAdd({ name: "home-lab", wait: true }, t.deps)).rejects.toMatchObject({
+      code: "ONPREM_SERVER_NAME_CONFLICT",
+      status: 409,
+      exitCode: 1,
+    });
+  });
+
+  it("서버_이름이_비어_있으면_사용법_오류다", async () => {
+    const t = await setup([]);
+
+    await expect(runServersAdd({ name: "  ", wait: true }, t.deps)).rejects.toMatchObject({ exitCode: 2, code: "USAGE" });
+    expect(t.calls).toHaveLength(0);
+  });
+
   it("다른_409_는_이름_중복으로_보지_않고_서버_메시지와_함께_알린다", async () => {
     const t = await setup([errorEnvelope(409, "CONFLICT", "something else")]);
 

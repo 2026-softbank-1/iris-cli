@@ -52,7 +52,7 @@ flowchart LR
 | `likelion diagnose [id] [--refresh] [--evidence]` | 실패한 배포의 AI 진단(원인·해결책)을 보여 주고, 없으면 시작해 끝날 때까지 기다린다 | 위와 같음 |
 | `likelion fix [id] [--yes]` | 실패한 배포를 AI 가 고치게 한다(핫픽스 PR → main 머지 → 재배포) | 위와 같음 |
 | `likelion services create [--project] [--repo] [--name] [--branch] [--root-dir] [--target] [--link\|--no-link]` | GitHub 저장소를 연결해 서비스를 만들고, 원하면 현재 폴더를 연결한다 | 구현됨 ([계약](docs/onprem-servers-contract.md)) |
-| `likelion servers` | 내 서버(온프레미스) 목록과 연결 상태를 보여 준다 | 구현됨 ([계약](docs/onprem-servers-contract.md)), 서버 API 는 iris-was 에서 구현 중 |
+| `likelion servers` | 내 서버(온프레미스) 목록과 연결 상태를 보여 준다 | 구현됨 ([계약](docs/onprem-servers-contract.md)), 운영 서버에서 등록·재발급·삭제 확인 |
 | `likelion servers add <name> [--wait\|--no-wait]` | 서버를 등록하고 서버에서 실행할 설치 명령을 보여 준 뒤 연결될 때까지 기다린다 | 위와 같음 |
 | `likelion servers token <name\|id> [--wait\|--no-wait]` | 등록 토큰을 다시 발급해 새 설치 명령을 보여 준다 | 위와 같음 |
 | `likelion servers remove <name\|id> [--yes]` | 서버를 삭제한다 (`rm` 도 된다) | 위와 같음 |

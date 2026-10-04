@@ -200,6 +200,18 @@ describe("runServicesCreate", () => {
     expect(await findLink(cwd())).toBeNull();
   });
 
+  it("서비스_만들기_거절도_서버_오류_코드와_상태를_지킨다", async () => {
+    const t = await setup([
+      projects(),
+      errorEnvelope(409, "SERVICE_NAME_CONFLICT", "service name already exists"),
+    ]);
+
+    await expect(runServicesCreate({ project: "demo", repo: REPO }, t.deps)).rejects.toMatchObject({
+      code: "SERVICE_NAME_CONFLICT",
+      status: 409,
+    });
+  });
+
   it.each([
     [
       errorEnvelope(409, "SERVICE_NAME_CONFLICT", "service name already exists"),

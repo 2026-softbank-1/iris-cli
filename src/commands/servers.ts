@@ -3,7 +3,9 @@ import {
   ApiError,
   CliError,
   describeTransientFailure,
+  explainApiError,
   isTransientFailure,
+  ResultError,
   UsageError,
 } from "../lib/errors.js";
 import { formatTable } from "../lib/format.js";
@@ -88,7 +90,7 @@ export async function runServersAdd(
 ): Promise<OnpremServer> {
   const log = deps.log ?? console.log;
   const name = options.name.trim();
-  if (!name) throw new CliError("서버 이름을 입력해 주세요.");
+  if (!name) throw new UsageError("서버 이름을 입력해 주세요.");
   const { api, credentials } = await requireSession(deps.fetchImpl);
   const token = credentials.token;
 
@@ -100,19 +102,20 @@ export async function runServersAdd(
     });
   } catch (error) {
     if (error instanceof ApiError && error.code === "ONPREM_SERVER_NAME_CONFLICT") {
-      throw new CliError(`같은 이름의 서버가 이미 있습니다: ${name}. 다른 이름을 쓰거나 \`likelion servers\` 로 확인해 주세요.`);
+      throw explainApiError(error, `같은 이름의 서버가 이미 있습니다: ${name}. 다른 이름을 쓰거나 \`likelion servers\` 로 확인해 주세요.`);
     }
     if (error instanceof ApiError && error.code === "ONPREM_SERVER_LIMIT_EXCEEDED") {
-      throw new CliError(
+      throw explainApiError(
+        error,
         `서버는 한 사람당 ${MAX_SERVERS}대까지 등록할 수 있습니다. 쓰지 않는 서버를 \`likelion servers remove <이름>\` 으로 지운 뒤 다시 등록해 주세요.`,
       );
     }
-    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw new CliError(NOT_CONFIGURED_MESSAGE);
+    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw explainApiError(error, NOT_CONFIGURED_MESSAGE);
     if (error instanceof ApiError && error.status === 409) {
-      throw new CliError(`서버를 등록할 수 없습니다 (${error.message}). \`likelion servers\` 로 확인해 주세요.`);
+      throw explainApiError(error, `서버를 등록할 수 없습니다 (${error.message}). \`likelion servers\` 로 확인해 주세요.`);
     }
     if (error instanceof ApiError && error.status === 422) {
-      throw new CliError(`서버 이름을 쓸 수 없습니다: ${name}. 1~63자로 정해 주세요.`);
+      throw explainApiError(error, `서버 이름을 쓸 수 없습니다: ${name}. 1~63자로 정해 주세요.`);
     }
     throw error;
   }
@@ -153,11 +156,12 @@ export async function runServersToken(
     );
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) {
-      throw new CliError(
+      throw explainApiError(
+        error,
         `${server.name} 은 지금 ${serverStatusLabel(server.status)} 상태라 토큰을 다시 발급할 수 없습니다. 대기·연결 중·실패 상태에서만 다시 발급합니다.`,
       );
     }
-    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw new CliError(NOT_CONFIGURED_MESSAGE);
+    if (error instanceof ApiError && error.code === "NOT_CONFIGURED") throw explainApiError(error, NOT_CONFIGURED_MESSAGE);
     throw error;
   }
 
@@ -206,7 +210,8 @@ export async function runServersRemove(
     await api.request<void>("DELETE", `/onprem-servers/${server.id}`, { token });
   } catch (error) {
     if (error instanceof ApiError && error.code === "ONPREM_SERVER_IN_USE") {
-      throw new CliError(
+      throw explainApiError(
+        error,
         `이 서버에 배포하는 서비스가 있어 삭제할 수 없습니다: ${server.name}. 그 서비스를 먼저 삭제해 주세요.`,
       );
     }
@@ -278,13 +283,15 @@ async function waitForConnection(
       return server;
     }
     if (server.status === "FAILED") {
-      throw new CliError(
+      throw new ResultError(
         `서버 연결에 실패했습니다 (${server.failureCode ?? "원인 미상"}). \`likelion servers token ${server.name}\` 으로 토큰을 다시 받아 서버에서 명령을 다시 실행하세요.`,
+        server.failureCode ?? "SERVER_CONNECT_FAILED",
       );
     }
     if (server.status === "PENDING" && isExpired(server, now())) {
-      throw new CliError(
+      throw new ResultError(
         `등록 토큰이 만료되었습니다. \`likelion servers token ${server.name}\` 으로 다시 발급하세요.`,
+        "REGISTRATION_TOKEN_EXPIRED",
       );
     }
 

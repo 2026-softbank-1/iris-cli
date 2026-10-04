@@ -1,5 +1,5 @@
 import type { ApiClient, FetchLike } from "../lib/api.js";
-import { ApiError, CliError } from "../lib/errors.js";
+import { ApiError, CliError, explainApiError } from "../lib/errors.js";
 import { findGitOrigin } from "../lib/git.js";
 import { type Link, saveLink } from "../lib/link.js";
 import { printJson, progressLog } from "../lib/output.js";
@@ -189,21 +189,29 @@ function warnIfNotConnected(choice: TargetChoice, warn: (message: string) => voi
   );
 }
 
-function describeCreateFailure(error: ApiError, project: Project): CliError | undefined {
+function describeCreateFailure(error: ApiError, project: Project): ApiError | undefined {
   switch (error.code) {
     case "SERVICE_NAME_CONFLICT":
-      return new CliError(
+      return explainApiError(
+        error,
         `'${project.name}' 프로젝트에 같은 이름의 서비스가 이미 있습니다. --name 으로 다른 이름을 정해 주세요.`,
       );
     case "REPOSITORY_NOT_ACCESSIBLE":
-      return new CliError(
+      return explainApiError(
+        error,
         "저장소에 접근할 수 없습니다. GitHub App 이 이 저장소에 설치돼 있고 접근 권한이 있는지 확인해 주세요.",
       );
     case "INVALID_INPUT":
-      return new CliError(INVALID_INPUT_MESSAGES[error.message] ?? `입력이 올바르지 않습니다: ${error.message}`);
+      return explainApiError(
+        error,
+        INVALID_INPUT_MESSAGES[error.message] ?? `입력이 올바르지 않습니다: ${error.message}`,
+      );
     case "VALIDATION_ERROR": {
       const fields = (error.details ?? []).map((detail) => `${detail.field}: ${detail.reason}`);
-      return new CliError(`입력이 올바르지 않습니다${fields.length > 0 ? ` (${fields.join(", ")})` : "."}`);
+      return explainApiError(
+        error,
+        `입력이 올바르지 않습니다${fields.length > 0 ? ` (${fields.join(", ")})` : "."}`,
+      );
     }
     default:
       return undefined;
