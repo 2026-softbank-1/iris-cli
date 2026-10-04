@@ -8,7 +8,7 @@ Likelion CLI (`likelion`)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
 ```bash
-npm install -g https://github.com/2026-softbank-1/iris-cli/releases/download/v0.4.2/likelion-0.4.2.tgz
+npm install -g https://github.com/2026-softbank-1/iris-cli/releases/download/v0.4.3/likelion-0.4.3.tgz
 likelion login
 likelion link && likelion up
 ```
@@ -60,7 +60,7 @@ flowchart LR
 
 ## 설치
 
-Node.js 20 이상이 필요하다. [Releases](https://github.com/2026-softbank-1/iris-cli/releases) 에 올라온 `likelion-<버전>.tgz` 를 설치한다(최신 v0.4.2). npm 에는 올리지 않는다(이름 `likelion` 을 다른 패키지가 쓰고 있다).
+Node.js 20 이상이 필요하다. [Releases](https://github.com/2026-softbank-1/iris-cli/releases) 에 올라온 `likelion-<버전>.tgz` 를 설치한다(최신 v0.4.3). npm 에는 올리지 않는다(이름 `likelion` 을 다른 패키지가 쓰고 있다).
 
 - 업데이트: 새 버전의 `.tgz` 주소로 위 설치 명령을 다시 실행한다.
 - 삭제: `npm uninstall -g likelion`.
